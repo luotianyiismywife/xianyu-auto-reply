@@ -103,18 +103,8 @@ async def list_orders(
         page_size=page_size,
     )
 
-    # 批量查询哪些订单是代销订单
-    from sqlalchemy import select as sa_select
-    from common.models.agent_order import AgentOrder
-    order_nos = [o.order_no for o in orders if o.order_no]
-    agent_order_nos: set[str] = set()
-    if order_nos:
-        from sqlalchemy import func as sa_func
-        agent_stmt = sa_select(AgentOrder.order_no).where(AgentOrder.order_no.in_(order_nos))
-        agent_result = await order_service.session.execute(agent_stmt)
-        agent_order_nos = {row[0] for row in agent_result.all()}
-
     # 关联自动发货消息日志，取每个订单最新发送状态与失败原因
+    order_nos = [o.order_no for o in orders if o.order_no]
     delivery_log_map = await order_service.get_delivery_log_status_map(order_nos)
 
     payload = []
@@ -152,7 +142,7 @@ async def list_orders(
                 card_only_delivered=bool(order.card_only_delivered),
                 delivery_send_status=(delivery_log or {}).get("send_status"),
                 delivery_send_fail_reason=(delivery_log or {}).get("send_fail_reason"),
-                is_agent_order=order.order_no in agent_order_nos,
+                is_agent_order=False,
                 source=order.source or "",
                 placed_at=order.placed_at,
                 created_at=order.created_at,
@@ -278,13 +268,6 @@ async def get_order_detail(
     # 关联查询商品标题
     item_title = await order_service.get_item_title(order.owner_id, order.item_id)
     
-    # 查询是否为代销订单
-    from sqlalchemy import select as sa_select, func as sa_func
-    from common.models.agent_order import AgentOrder
-    agent_stmt = sa_select(sa_func.count(AgentOrder.id)).where(AgentOrder.order_no == order_no)
-    agent_result = await order_service.session.execute(agent_stmt)
-    is_agent_order = (agent_result.scalar() or 0) > 0
-
     # 关联自动发货消息日志，取最新发送状态与失败原因
     delivery_log_map = await order_service.get_delivery_log_status_map([order.order_no] if order.order_no else [])
     delivery_log = delivery_log_map.get(order.order_no) if order.order_no else None
@@ -320,7 +303,7 @@ async def get_order_detail(
             "card_only_delivered": bool(order.card_only_delivered),
             "delivery_send_status": (delivery_log or {}).get("send_status"),
             "delivery_send_fail_reason": (delivery_log or {}).get("send_fail_reason"),
-            "is_agent_order": is_agent_order,
+            "is_agent_order": False,
             "source": order.source or "",
             "placed_at": safe_isoformat(order.placed_at),
             "created_at": safe_isoformat(order.created_at),
@@ -660,17 +643,9 @@ async def manual_delivery(
         skipped_due_to_dock = bool(delivery_data.get('skipped_due_to_dock_card'))
         # 多数量退化标记：订单 quantity>1 但因卡券类型限制只发了 1 张，
         # 写入 delivery_fail_reason 提醒商家原因和后续动作
-        quantity_degraded_for_dock = bool(delivery_data.get('quantity_degraded_for_dock_card'))
         quantity_degraded_for_fixed = bool(delivery_data.get('quantity_degraded_for_fixed_content'))
         degraded_warn_msg = None
-        if quantity_degraded_for_dock:
-            requested = delivery_data.get('quantity_requested') or order.quantity or 1
-            sent = delivery_data.get('quantity_sent') or 1
-            degraded_warn_msg = (
-                f"⚠️ 对接卡券暂不支持多数量发货：订单数量 {requested} 张，"
-                f"已发送 {sent} 张，剩余 {max(requested - sent, 0)} 张请手动补发或改用自有卡券"
-            )
-        elif quantity_degraded_for_fixed:
+        if quantity_degraded_for_fixed:
             requested = delivery_data.get('quantity_requested') or order.quantity or 1
             sent = delivery_data.get('quantity_sent') or 1
             degraded_warn_msg = (

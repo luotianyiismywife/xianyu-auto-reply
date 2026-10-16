@@ -826,21 +826,3 @@
                 0 2px 4px -2px rgb(0 0 0 / 0.05);
   }
 }
-
-/* ========================================
-   公告垂直滚动动画
-   ======================================== */
-@keyframes announcement-slide-in {
-  0% {
-    opacity: 0;
-    transform: translateY(100%);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.announcement-vertical-scroll {
-  animation: announcement-slide-in 0.5s ease-out;
-}

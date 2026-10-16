@@ -79,7 +79,7 @@ async def login_user(
     setting_service = SystemSettingService(session)
     all_settings = await setting_service.list_settings()
     captcha_enabled_str = all_settings.get("login_captcha_enabled")
-    captcha_enabled = captcha_enabled_str in (None, "true", "1")  # 默认开启
+    captcha_enabled = captcha_enabled_str in ("true", "1")  # 默认关闭
 
     # 账号密码登录和邮箱密码登录需要验证滑动验证码
     if payload.username and payload.password:

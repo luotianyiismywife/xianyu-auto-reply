@@ -10,28 +10,21 @@ from fastapi import APIRouter
 
 # 导入所有路由模块
 from . import (
-    activation,
     admin,
-    advertisements,
     ai,
     ai_listing,
-    announcements,
     auto_reply_logs,
     auth,
     auto_rate,
     blacklist,
     captcha,
     cards,
-    card_dock,
     data_analysis,
-    distribution,
     chat_new,
     chat_new_ws,
     chat_new_image,
     chat_quick_phrase,
     chat_customer_order,
-    payment,
-    popup_announcements,
     confirm_receipt_messages,
     api_cookie_renew_logs,
     cookie_refresh,
@@ -66,16 +59,11 @@ from . import (
     external_orders,
     external_publish,
     proxy,
-    refund_cancel,
-    agree_deliver,
-    agree_pickup,
     qr_login,
-    qrcode,
     risk_control_logs,
     account_login_logs,
     db_backup_logs,
     search,
-    shared_scan,
     system_control,
     system_settings,
     token_renewal_logs,
@@ -95,9 +83,6 @@ api_router.include_router(health.router, tags=["健康检查"])  # 已定义pref
 # 注册所有路由
 # 注意：路由文件中已定义prefix的，这里不再重复添加prefix
 # 路由文件中未定义prefix的，在这里统一添加prefix
-
-# 激活码（公开接口，无需登录）
-api_router.include_router(activation.router, prefix="/activation", tags=["激活码"])
 
 # 认证相关
 api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
@@ -129,9 +114,6 @@ api_router.include_router(external_orders.router, tags=["公开订单查询"])  
 api_router.include_router(external_publish.router, tags=["公开商品发布"])  # 已定义prefix="/external/publish"
 api_router.include_router(keywords.router, prefix="/keywords-with-item-id", tags=["关键词管理"])
 api_router.include_router(cards.router, prefix="/cards", tags=["卡券管理"])
-api_router.include_router(distribution.router, prefix="/distribution", tags=["分销管理"])
-api_router.include_router(card_dock.router, tags=["分销卡券"])  # 已定义prefix="/card-dock"
-api_router.include_router(payment.router, tags=["支付管理"])  # 已定义prefix="/payment"
 
 # AI回复
 api_router.include_router(ai.router, prefix="/ai-reply-settings", tags=["AI回复"])
@@ -153,10 +135,7 @@ api_router.include_router(auto_rate.router, prefix="/auto-rate", tags=["自动�
 # 系统设置
 api_router.include_router(system_settings.router, prefix="/system-settings", tags=["系统设置"])
 api_router.include_router(system_control.router, tags=["系统管理"])  # 已定义prefix="/system-control"
-api_router.include_router(announcements.router, prefix="/announcements", tags=["公告管理"])
-api_router.include_router(popup_announcements.router, prefix="/popup-announcements", tags=["弹窗公告"])
 api_router.include_router(feedback.router, prefix="/feedbacks", tags=["反馈管理"])
-api_router.include_router(advertisements.router, prefix="/advertisements", tags=["广告管理"])
 api_router.include_router(auto_reply_logs.router, tags=["消息日志"])
 api_router.include_router(account_login_logs.router, tags=["账号登录日志"])
 api_router.include_router(user_login_logs.router, tags=["用户登录日志"])
@@ -171,12 +150,7 @@ api_router.include_router(token_renewal_logs.router, prefix="/admin", tags=["Tok
 
 # 代理和上传
 api_router.include_router(proxy.router, prefix="/proxy", tags=["代理配置"])
-api_router.include_router(refund_cancel.router, prefix="/refund-cancel", tags=["退款订单注销配置"])
-api_router.include_router(agree_deliver.router, prefix="/agree-deliver", tags=["同意后发货配置"])
-# 同意后发货提货页（公开接口，无需登录）
-api_router.include_router(agree_pickup.router, prefix="/agree-pickup", tags=["同意后发货提货页"])
 api_router.include_router(upload.router, prefix="/upload", tags=["文件上传"])
-api_router.include_router(qrcode.router, tags=["群二维码"])  # 已定义prefix="/qrcode"
 
 # Cookie和验证
 api_router.include_router(cookie_refresh.router, tags=["Cookie刷新管理"])  # 已定义prefix="/cookie-refresh"
@@ -185,7 +159,6 @@ api_router.include_router(geetest.router, tags=["极验验证码"])  # 已定义
 api_router.include_router(captcha.router, tags=["验证码"])  # 已定义prefix="/captcha"
 api_router.include_router(qr_login.router, tags=["二维码登录"])  # 已定义prefix="/qr-login"
 api_router.include_router(password_login.router, tags=["密码登录"])  # 已定义prefix="/password-login"
-api_router.include_router(shared_scan.router, tags=["共享多人扫码登录"])  # 已定义prefix="/shared-scan"
 
 # 数据分析
 api_router.include_router(data_analysis.router, tags=["数据分析"])  # 已定义prefix="/data-analysis"

@@ -14,13 +14,6 @@ import tkinter.ttk as ttk
 
 from launcher.gui_theme import COLORS
 from launcher.config_store import load_connection_config
-from launcher.activation import (
-    load_and_verify_license,
-    format_expire_time,
-    get_remaining_text,
-)
-from launcher.updater import check_update, download_update, apply_update
-from launcher.version import CURRENT_VERSION
 
 # 左侧导航菜单项定义：(标识key, 显示文字)
 _NAV_ITEMS = [
@@ -29,7 +22,6 @@ _NAV_ITEMS = [
     ("log_backend-web", "Backend 日志"),
     ("log_websocket", "WebSocket 日志"),
     ("log_scheduler", "定时任务日志"),
-    ("renew", "激活码续期"),
     ("about", "关于"),
 ]
 
@@ -141,9 +133,6 @@ def _switch_page(app, nav_key: str):
         render_dashboard_page(app)
     elif nav_key == "status":
         _render_status_content(app)
-    elif nav_key == "renew":
-        from launcher.gui_renew import render_renew_page
-        render_renew_page(app)
     elif nav_key == "about":
         from launcher.gui_about import render_about_page
         render_about_page(app)
@@ -169,26 +158,6 @@ def _render_status_content(app):
     # 标题
     tk.Label(inner, text="服务状态", font=("微软雅黑", 14, "bold"),
              fg=COLORS["text"], bg=COLORS["card_bg"]).pack(anchor=tk.W, padx=20, pady=(16, 6))
-
-    # 激活到期信息
-    expire_frame = tk.Frame(inner, bg=COLORS["card_bg"])
-    expire_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
-
-    license_info = load_and_verify_license(app.machine_id)
-    expire_ts = license_info.get("expire_ts", 0)
-    expire_str = format_expire_time(expire_ts)
-    remain_str = get_remaining_text(expire_ts)
-
-    # 到期时间和剩余时间放在同一行
-    tk.Label(expire_frame, text=f"到期时间: {expire_str}", font=("微软雅黑", 9),
-             fg=COLORS["text_secondary"], bg=COLORS["card_bg"]).pack(side=tk.LEFT)
-    remain_color = COLORS["error"] if remain_str == "已过期" else COLORS["accent"]
-    app._remain_label = tk.Label(expire_frame, text=f"（{remain_str}）",
-                                  font=("微软雅黑", 9, "bold"),
-                                  fg=remain_color, bg=COLORS["card_bg"])
-    app._remain_label.pack(side=tk.LEFT, padx=(6, 0))
-    # 保存到期时间戳供定时刷新使用
-    app._expire_ts = expire_ts
 
     # 状态列表
     status_frame = tk.Frame(inner, bg=COLORS["card_bg"])
@@ -262,17 +231,6 @@ def _render_status_content(app):
         tk.Label(url_frame, text=f"{name}：http://{addr}", font=("Consolas", 9),
                  fg=COLORS["text_secondary"], bg=COLORS["card_bg"]).pack(anchor=tk.W, pady=1)
 
-    # 在线版本提示
-    online_frame = tk.Frame(inner, bg="#EFF6FF", padx=12, pady=8)
-    online_frame.pack(fill=tk.X, padx=20, pady=(8, 0))
-    tk.Label(online_frame, text="🌐 在线版本：", font=("微软雅黑", 10),
-             fg=COLORS["text"], bg="#EFF6FF").pack(side=tk.LEFT)
-    online_url = "https://xy.zhinianboke.com"
-    online_lbl = tk.Label(online_frame, text=online_url, font=("Consolas", 10, "underline"),
-                          fg=COLORS["primary"], bg="#EFF6FF", cursor="hand2")
-    online_lbl.pack(side=tk.LEFT)
-    online_lbl.bind("<Button-1>", lambda e: __import__("webbrowser").open(online_url))
-
     # 分隔线
     tk.Frame(inner, bg=COLORS["border"], height=1).pack(fill=tk.X, padx=20, pady=8)
 
@@ -313,13 +271,6 @@ def _render_status_content(app):
         command=lambda: _on_stop(app, btn_stop))
     btn_stop.pack(side=tk.LEFT, padx=(0, 8))
     app._btn_stop = btn_stop
-
-    btn_update = tk.Button(
-        btn_area, text="📦 检查更新", font=_btn_font,
-        fg=COLORS["text"], bg="#f1f5f9", activebackground="#e2e8f0",
-        bd=0, cursor="hand2", **_btn_pad,
-        command=lambda: _on_check_update(app, btn_update))
-    btn_update.pack(side=tk.LEFT)
 
 
 def _on_refresh(app, btn):
@@ -386,144 +337,17 @@ def refresh_status(app):
 
 
 def _auto_refresh(app):
-    """每5秒自动刷新状态和剩余时间，并检测激活码是否到期"""
+    """每5秒自动刷新服务状态"""
     if app._current_page == "running":
         if getattr(app, "_active_sub_page", "") == "status":
             refresh_status(app)
-            _update_remaining(app)
-        # 检测是否到期
-        _check_expire(app)
         app.root.after(5000, lambda: _auto_refresh(app))
 
 
-def _update_remaining(app):
-    """刷新剩余时间显示"""
-    if not hasattr(app, "_remain_label") or not hasattr(app, "_expire_ts"):
-        return
-    remain_str = get_remaining_text(app._expire_ts)
-    remain_color = COLORS["error"] if remain_str == "已过期" else COLORS["accent"]
-    app._remain_label.configure(text=f"（{remain_str}）", fg=remain_color)
-
-
-def _check_expire(app):
-    """检测激活码是否到期，到期则停止服务并跳转激活页面"""
-    result = load_and_verify_license(app.machine_id)
-    if result.get("expired", False) or not result.get("valid", False):
-        # 在子线程中停止服务，避免UI卡死
-        def _do_expire_stop():
-            app.service_manager.stop_all()
-            app.root.after(0, lambda: _show_expire_page(app, result))
-        threading.Thread(target=_do_expire_stop, daemon=True).start()
-
-
-def _show_expire_page(app, result):
-    """激活码到期后跳转到激活页面"""
-    msg = result.get("message", "激活码已到期，请重新激活")
-    app._show_activation_page(msg)
-
-
-def _on_check_update(app, btn):
-    """检查更新按钮点击处理：子线程中检查，主线程显示结果"""
-    btn.configure(text="📦 检查中...", state=tk.DISABLED)
-    app.root.update_idletasks()
-
-    def _do_check():
-        result = check_update()
-        app.root.after(0, lambda: _show_update_result(app, btn, result))
-
-    threading.Thread(target=_do_check, daemon=True).start()
-
-
-def _show_update_result(app, btn, result):
-    """显示版本检查结果，有新版本则弹出确认下载对话框"""
-    btn.configure(text="📦 检查更新", state=tk.NORMAL)
-
-    if result["error"]:
-        messagebox.showwarning("检查更新", result["error"])
-        return
-
-    if not result["has_update"]:
-        messagebox.showinfo("检查更新",
-                            f"当前已是最新版本 v{CURRENT_VERSION}")
-        return
-
-    # 有新版本，弹出确认对话框
-    desc = result["description"].replace("\\n", "\n")
-    msg = (f"发现新版本 v{result['remote_version']}\n"
-           f"当前版本 v{CURRENT_VERSION}\n\n"
-           f"更新说明:\n{desc}\n\n"
-           f"是否立即下载更新？")
-    if messagebox.askyesno("发现新版本", msg):
-        _start_download(app, result)
-
-
-def _start_download(app, update_info):
-    """开始下载新版本，显示进度弹窗"""
-    # 创建进度弹窗
-    dlg = tk.Toplevel(app.root)
-    dlg.title("下载更新")
-    dlg.geometry("400x150")
-    dlg.resizable(False, False)
-    dlg.transient(app.root)
-    dlg.grab_set()
-
-    tk.Label(dlg, text=f"正在下载 v{update_info['remote_version']}...",
-             font=("微软雅黑", 10)).pack(pady=(20, 10))
-
-    progress_var = tk.DoubleVar(value=0)
-    progress_bar = ttk.Progressbar(dlg, variable=progress_var,
-                                    maximum=100, length=350)
-    progress_bar.pack(padx=20)
-
-    status_var = tk.StringVar(value="准备下载...")
-    tk.Label(dlg, textvariable=status_var,
-             font=("微软雅黑", 9)).pack(pady=(8, 0))
-
-    def _progress_cb(downloaded, total):
-        pct = (downloaded / total) * 100 if total > 0 else 0
-        mb_done = downloaded / 1048576
-        mb_total = total / 1048576
-        app.root.after(0, lambda: progress_var.set(pct))
-        app.root.after(0, lambda: status_var.set(
-            f"{mb_done:.1f}MB / {mb_total:.1f}MB ({pct:.0f}%)"))
-
-    def _do_download():
-        result = download_update(
-            update_info["filename"],
-            progress_callback=_progress_cb,
-        )
-        app.root.after(0, lambda: _on_download_done(app, dlg, result))
-
-    threading.Thread(target=_do_download, daemon=True).start()
-
-
-def _on_download_done(app, dlg, result):
-    """下载完成后处理：校验成功则执行更新"""
-    dlg.destroy()
-
-    if not result["success"]:
-        messagebox.showerror("下载失败", result["error"])
-        return
-
-    msg = "下载完成！点击确定将关闭程序并自动更新，更新完成后会自动重启。"
-    if not messagebox.askokcancel("确认更新", msg):
-        return
-
-    # 生成更新脚本并退出
-    apply_result = apply_update(result["file_path"])
-    if not apply_result["success"]:
-        messagebox.showerror("更新失败", apply_result["error"])
-        return
-
-    # 停止所有服务并退出程序
-    app.service_manager.stop_all()
-    app.root.destroy()
-
-
 def open_browser():
-    """在默认浏览器中打开管理后台"""
-    import webbrowser
-    webbrowser.open("http://127.0.0.1:9000")
+    """用内置 Chromium 打开管理后台窗口"""
+    from launcher.browser_window import open_browser_window
+    open_browser_window()
 
 
 def restart_services(app):

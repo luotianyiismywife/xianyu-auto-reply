@@ -21,8 +21,6 @@ logger = logging.getLogger(__name__)
 
 # 远程公开接口路径（与本服务保持一致，官方服务器同样暴露这些接口）
 _REMOTE_ADS_PATH = "/api/v1/advertisements/public"
-_REMOTE_ANNOUNCEMENTS_PATH = "/api/v1/announcements/public"
-_REMOTE_POPUP_ANNOUNCEMENTS_PATH = "/api/v1/popup-announcements/public"
 # 远程请求超时（秒）：该接口在用户请求链路中同步等待，超时设小以降低对本地内容展示的阻塞
 _REMOTE_TIMEOUT = 4
 # 远程拉取使用的固定 User-Agent：用于识别「服务器之间的远程拉取请求」，
@@ -158,84 +156,3 @@ async def fetch_remote_public_ads(
         text.append(_normalize_remote_ad(ad, seq, base_url))
 
     return {"carousel": carousel, "text": text}
-
-
-# ==================== 远程公告 ====================
-
-def _normalize_remote_announcement(ann: dict[str, Any], seq: int) -> dict[str, Any]:
-    """规范化单条远程公告：标记来源为 remote，并将 ID 取负避免与本地正数 ID 冲突"""
-    item = dict(ann)
-    item["source"] = "remote"
-    item["id"] = -seq
-    return item
-
-
-async def fetch_remote_public_announcements(
-    local_dedup_keys: set[tuple[str | None, str | None]] | None = None,
-) -> list[dict[str, Any]]:
-    """
-    拉取远程官方服务器的公开公告并规范化
-
-    Args:
-        local_dedup_keys: 本地公告去重键集合（标题, 内容），命中的远程公告将被跳过，
-            避免官方服务器自身部署时重复展示自己的公告
-
-    Returns:
-        公告列表，失败或未启用时返回空列表
-    """
-    if not get_settings().enable_remote_announcements:
-        return []
-
-    data = await _fetch_remote_json(_REMOTE_ANNOUNCEMENTS_PATH)
-    if not data or not data.get("success") or not data.get("data"):
-        return []
-
-    raw_items = data["data"].get("items") or []
-    dedup = local_dedup_keys or set()
-    items: list[dict[str, Any]] = []
-    seq = 0
-
-    for ann in raw_items:
-        if (ann.get("title"), ann.get("content")) in dedup:
-            continue
-        seq += 1
-        items.append(_normalize_remote_announcement(ann, seq))
-
-    return items
-
-
-# ==================== 远程弹窗公告 ====================
-
-async def fetch_remote_public_popup_announcements(
-    local_dedup_keys: set[tuple[str | None, str | None]] | None = None,
-) -> list[dict[str, Any]]:
-    """
-    拉取远程官方服务器的公开弹窗公告并规范化
-
-    Args:
-        local_dedup_keys: 本地弹窗公告去重键集合（标题, 内容），命中的远程弹窗公告将被跳过，
-            避免官方服务器自身部署时重复展示自己的弹窗公告
-
-    Returns:
-        弹窗公告列表，失败或未启用时返回空列表
-    """
-    if not get_settings().enable_remote_popup_announcements:
-        return []
-
-    data = await _fetch_remote_json(_REMOTE_POPUP_ANNOUNCEMENTS_PATH)
-    if not data or not data.get("success") or not data.get("data"):
-        return []
-
-    raw_items = data["data"].get("items") or []
-    dedup = local_dedup_keys or set()
-    items: list[dict[str, Any]] = []
-    seq = 0
-
-    for ann in raw_items:
-        if (ann.get("title"), ann.get("content")) in dedup:
-            continue
-        seq += 1
-        # 弹窗公告与公告结构一致（source=remote、ID 取负），复用公告的规范化逻辑
-        items.append(_normalize_remote_announcement(ann, seq))
-
-    return items

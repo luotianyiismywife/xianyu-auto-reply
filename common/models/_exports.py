@@ -21,7 +21,6 @@ from common.models.notification_channel import NotificationChannel
 from common.models.message_notification import MessageNotification
 from common.models.feedback import Feedback, FeedbackType
 from common.models.feedback_message import FeedbackMessage
-from common.models.advertisement import Advertisement, AdType, AdStatus
 from common.models.goofish_crawl_job import GoofishCrawlJob
 from common.models.goofish_crawl_item import GoofishCrawlItem
 from common.models.cookie_refresh_schedule import CookieRefreshSchedule
@@ -34,14 +33,9 @@ from common.models.scheduled_cookies_refresh_log import ScheduledCookiesRefreshL
 from common.models.scheduled_api_cookie_renew_log import ScheduledApiCookieRenewLog
 from common.models.scheduled_close_notice_log import ScheduledCloseNoticeLog
 from common.models.db_backup_log import DbBackupLog
-from common.models.announcement import Announcement
 from common.models.confirm_receipt_message import ConfirmReceiptMessage
 from common.models.scheduled_task import ScheduledTask
 from common.models.card_item_relation import CardItemRelation
-from common.models.recharge_order import RechargeOrder
-from common.models.dock_code_binding import DockCodeBinding
-from common.models.agent_order import AgentOrder
-from common.models.settlement_record import SettlementRecord
 from common.models.product_material import ProductMaterial
 from common.models.publish_log import PublishLog
 from common.models.publish_address import PublishAddress
@@ -52,8 +46,6 @@ from common.models.listing_monitor_item import ListingMonitorItem
 from common.models.listing_monitor_log import ListingMonitorLog
 from common.models.collect_fallback_account import CollectFallbackAccount
 from common.models.order_fallback_account import OrderFallbackAccount
-from common.models.shared_scan_session import SharedScanSession
-from common.models.shared_scan_worker import SharedScanWorker
 from common.models.auto_reply_message_log import XYAutoReplyMessageLog
 from common.models.fy_account import FYAccount, FYAccountType
 from common.models.fy_product_rule import FYProductRule
@@ -92,9 +84,6 @@ __all__ = [
     "Feedback",
     "FeedbackType",
     "FeedbackMessage",
-    "Advertisement",
-    "AdType",
-    "AdStatus",
     "GoofishCrawlJob",
     "GoofishCrawlItem",
     "CookieRefreshSchedule",
@@ -107,14 +96,9 @@ __all__ = [
     "ScheduledApiCookieRenewLog",
     "ScheduledCloseNoticeLog",
     "DbBackupLog",
-    "Announcement",
     "ConfirmReceiptMessage",
     "ScheduledTask",
     "CardItemRelation",
-    "RechargeOrder",
-    "DockCodeBinding",
-    "SettlementRecord",
-    "AgentOrder",
     "ProductMaterial",
     "PublishLog",
     "PublishAddress",
@@ -125,8 +109,6 @@ __all__ = [
     "ListingMonitorLog",
     "CollectFallbackAccount",
     "OrderFallbackAccount",
-    "SharedScanSession",
-    "SharedScanWorker",
     "XYAutoReplyMessageLog",
     "FYAccount",
     "FYAccountType",

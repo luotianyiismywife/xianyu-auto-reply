@@ -20,7 +20,6 @@ from app.core.config import get_settings
 from app.core.http_client import get_http_client
 from app.services.auto_reply_stats_service import AutoReplyStatsService
 from app.services.dashboard_stats_cache_service import DashboardStatsCacheService
-from common.models.agent_order import AgentOrder
 from common.models.card import Card
 from common.models.user import User
 from common.models.xy_account import XYAccount
@@ -209,9 +208,6 @@ class DashboardStatsService:
         placed_row = await self._get_today_order_summary_row(time_column=XYOrder.placed_at, start_time=today_start)
         self._merge_order_summary_row(today_order_summary, placed_row)
 
-        today_agent_orders_stmt = select(func.count()).select_from(AgentOrder).where(AgentOrder.created_at >= today_start)
-        today_agent_orders = int((await self.session.execute(today_agent_orders_stmt)).scalar() or 0)
-
         return {
             "admin_stats": {
                 "total_users": total_users,
@@ -231,7 +227,7 @@ class DashboardStatsService:
                 "today_shipped": int(today_order_summary["today_shipped"]),
                 "today_pending": int(today_order_summary["today_pending"]),
                 "today_amount": round(float(today_order_summary["today_amount"]), 2),
-                "today_agent_orders": today_agent_orders,
+                "today_agent_orders": 0,
             },
         }
 

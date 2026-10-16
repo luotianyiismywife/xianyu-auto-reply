@@ -241,10 +241,6 @@ export interface LoginBrandingSettings {
   'login.system_description': string
 }
 
-export interface AuthFooterAdSettings {
-  'auth.footer_ad_html': string
-}
-
 export type ThemeEffect = 'solid' | 'gradient'
 export type ThemeColorPreset = 'ocean' | 'emerald' | 'violet' | 'indigo' | 'amber' | 'sunset' | 'aurora' | 'rose' | 'ruby'
 export type ThemeFontFamily = 'system' | 'yahei' | 'heiti' | 'songti' | 'kaiti' | 'fangsong' | 'xingkai' | 'rounded' | 'monospace'

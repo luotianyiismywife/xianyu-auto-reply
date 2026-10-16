@@ -1374,9 +1374,6 @@ class AutoDeliveryHandler:
                     success_count = 0
                     order_already_shipped = False  # 标记订单是否已发货
                     form_delivery_content = None  # 无需邮寄表单成功时记录凭证，但不发送聊天消息
-                    # 对接卡券退化标记：多数量循环里若第 1 张匹配到对接卡券，强制 break 退化为 1 张
-                    # 规避底层 _create_agent_order + settlement_service 在 N 次调用时引发的金额 bug
-                    quantity_degraded_for_dock = False
                     # 固定内容类型（text/image）退化标记：循环 N 次只是把同一段话/同一张图重复发 N 次，
                     # 业务上无意义且会打扰买家。商家若需要多数量真正发不同内容，应使用 data 或 api 类型卡券
                     quantity_degraded_for_fixed_content = False
@@ -1414,18 +1411,6 @@ class AutoDeliveryHandler:
                                 success_count += 1
                                 if quantity_to_send > 1:
                                     logger.info(f"第 {i+1}/{quantity_to_send} 个卡券内容获取成功")
-
-                                # 对接卡券退化保护：第 1 张发货完成后，若卡券来源是 dock_l1/dock_l2，
-                                # 立即 break 退化为 1 张，避免后续 N-1 张触发代理订单结算的金额 bug。
-                                # 退化原因详见 internal API deliver_order 注释（手续费重复扣等）。
-                                if quantity_to_send > 1 and self._last_delivery_card_source in ('dock_l1', 'dock_l2'):
-                                    quantity_degraded_for_dock = True
-                                    logger.warning(
-                                        f"【{self.cookie_id}】订单 {order_id} 对接卡券暂不支持多数量发货，"
-                                        f"已退化为 1 张（原数量 {quantity_to_send}，card_source={self._last_delivery_card_source}）。"
-                                        f"剩余 {quantity_to_send - 1} 张请商家手动补发或改用自有卡券"
-                                    )
-                                    break
 
                                 # text/image 固定内容卡券退化保护：第 1 张发货完成后，若卡券类型是
                                 # text 或 image，立即 break。这两种类型每次返回相同 text_content/image_url，
@@ -1761,17 +1746,7 @@ class AutoDeliveryHandler:
 
                         # 发送成功通知（仅 IM 通知，fail_reason 写库延后到 update_order_delivery_info 之后，
                         # 否则会被 update_order_delivery_info 内部的 delivery_fail_reason=None 清空）
-                        if quantity_degraded_for_dock:
-                            # 对接卡券退化场景：商家必须明确知道还要手动补发剩余卡密
-                            remaining = max(quantity_to_send - len(delivery_contents), 0)
-                            await self.send_delivery_failure_notification(
-                                send_user_name, send_user_id, item_id,
-                                f"⚠️ 对接卡券暂不支持多数量发货：订单数量 {quantity_to_send} 张，"
-                                f"已自动发送 {len(delivery_contents)} 张，剩余 {remaining} 张请手动补发或改用自有卡券",
-                                chat_id,
-                                order_id=order_id,
-                            )
-                        elif quantity_degraded_for_fixed_content:
+                        if quantity_degraded_for_fixed_content:
                             # text/image 固定内容卡券退化场景：商家应改用 data/api 类型卡券支持多数量
                             remaining = max(quantity_to_send - len(delivery_contents), 0)
                             await self.send_delivery_failure_notification(
@@ -1856,13 +1831,7 @@ class AutoDeliveryHandler:
                                 # delivery_fail_reason=None 清空。card_only 走 record_delivery_for_closed_order
                                 # 不清空 fail_reason 但仍走相同写入路径，保持文案一致便于商家查看。
                                 degraded_warn_msg = None
-                                if quantity_degraded_for_dock:
-                                    remaining = max(quantity_to_send - len(delivery_contents), 0)
-                                    degraded_warn_msg = (
-                                        f"⚠️ 对接卡券暂不支持多数量发货：订单数量 {quantity_to_send} 张，"
-                                        f"已自动发送 {len(delivery_contents)} 张，剩余 {remaining} 张请手动补发或改用自有卡券"
-                                    )
-                                elif quantity_degraded_for_fixed_content:
+                                if quantity_degraded_for_fixed_content:
                                     remaining = max(quantity_to_send - len(delivery_contents), 0)
                                     degraded_warn_msg = (
                                         f"⚠️ 固定内容卡券（{self._last_delivery_card_type} 类型）不支持多数量发货："
@@ -2289,28 +2258,17 @@ class AutoDeliveryHandler:
             self._last_delivery_card_source = card_source
             self._last_delivery_card_type = card.get('type')
 
-            # card_only 模式（禁止发货 + 主动关闭订单 + 仅发卡券）下，对接卡券会让货主双重亏损：
-            #   - 闲鱼订单被关闭 → 买家拿到全额退款
-            #   - 但 _create_agent_order 仍会扣货主对接账户余额并分润给上下级代理
-            # 为避免这种意外财务损失，对接卡券一律不走 card_only 流程，等同于 block：
+            # card_only 模式（禁止发货 + 主动关闭订单 + 仅发卡券）：
             # 订单已被关闭，但卡券不发送。
-            if closed_order_card_only and card_source in ('dock_l1', 'dock_l2'):
+            if closed_order_card_only:
                 self._last_delivery_fail_reason = (
-                    f"card_only 模式不适用于对接卡券（card_source={card_source}），"
-                    f"为避免货主财务损失，跳过卡券发送（订单已被关闭）"
+                    f"card_only 模式：订单已被关闭，跳过卡券发送"
                 )
                 logger.warning(
-                    f"⚠️ 【{self.cookie_id}】card_only 模式 + 对接卡券：跳过卡券发送，"
-                    f"order_id={order_id}, card_source={card_source}"
+                    f"⚠️ 【{self.cookie_id}】card_only 模式：跳过卡券发送，"
+                    f"order_id={order_id}"
                 )
                 return None
-
-            if card_source in ('dock_l1', 'dock_l2') and order_id:
-                if not await self._validate_dock_delivery(order_id, card):
-                    # _validate_dock_delivery 已在内部设置 self._last_delivery_fail_reason
-                    logger.warning(f"⚠️ 对接卡券发货校验未通过，跳过自动发货: 订单={order_id}, 来源={card_source}"
-                                   f", 原因={self._last_delivery_fail_reason}")
-                    return None
             
             # 构建与原有rule格式兼容的数据结构
             rule = {
@@ -2628,20 +2586,6 @@ class AutoDeliveryHandler:
                     db_manager.increment_delivery_count(rule['card_id'])
                     logger.info(f"自动发货成功: 卡券ID={rule['card_id']}, 内容长度={len(delivery_content)}")
                     
-                    # 如果是对接卡券，创建代理订单记录
-                    card_source = card.get('card_source', 'own')
-                    if card_source in ('dock_l1', 'dock_l2'):
-                        try:
-                            await self._create_agent_order(
-                                order_id=order_id,
-                                item_id=item_id,
-                                card=card,
-                                delivery_content=delivery_content,
-                                buyer_id=send_user_id,
-                            )
-                        except Exception as agent_err:
-                            logger.error(f"创建代理订单失败（不影响发货）: {self._safe_str(agent_err)}")
-                    
                     return {
                         'content': delivery_content,
                         'platform_shipping_confirmed': platform_shipping_confirmed,
@@ -2662,435 +2606,6 @@ class AutoDeliveryHandler:
             logger.error(f"自动发货失败: {self._safe_str(e)}")
             return None
 
-
-    # ==================== 对接卡券发货校验 ====================
-
-    async def _validate_dock_delivery(self, order_id: str, card: dict) -> bool:
-        """
-        校验对接卡券是否允许发货
-        
-        校验规则：
-        1. 订单售价 >= 卡券最低售价（min_price）
-        2. 订单售价 >= 手续费 + 各级代理成本
-        3. 代理余额是否足够支付卡券成本（+手续费，若由分销商承担）
-        
-        Args:
-            order_id: 订单号
-            card: 卡券字典（含 card_source, dock_record_id, id 等）
-            
-        Returns:
-            True=允许发货, False=不允许
-        """
-        from common.db.session import async_session_maker
-        from common.models.dock_record import DockRecord
-        from common.models.card import Card as CardModel
-        from common.models.system_setting import SystemSetting
-        from common.services.settlement_service import SettlementService
-        from decimal import Decimal, InvalidOperation
-        from sqlalchemy import select
-        
-        card_source = card.get('card_source', 'own')
-        dock_record_id = card.get('dock_record_id')
-        
-        # 自有卡券不需要校验
-        if card_source == 'own' or not dock_record_id:
-            return True
-        
-        try:
-            async with async_session_maker() as session:
-                # 获取订单售价
-                sale_price_str = '0.00'
-                try:
-                    from common.db.compat import db_manager
-                    order_info = db_manager.get_order_by_id(order_id)
-                    if order_info and order_info.get('amount'):
-                        sale_price_str = str(order_info['amount'])
-                except Exception as e:
-                    logger.warning(f"校验-获取订单售价失败: {self._safe_str(e)}")
-                
-                sale_price = Decimal(sale_price_str)
-                logger.info(f"📋 校验-订单售价: order_id={order_id}, sale_price_str='{sale_price_str}', sale_price={sale_price}")
-                
-                # 获取卡券信息
-                card_stmt = select(CardModel).where(CardModel.id == card.get('id'))
-                card_result = await session.execute(card_stmt)
-                card_obj = card_result.scalars().first()
-                
-                if not card_obj:
-                    self._last_delivery_fail_reason = f"对接卡券校验失败-未找到卡券 {card.get('id')}"
-                    logger.warning(f"校验-未找到卡券 {card.get('id')}，跳过发货")
-                    return False
-                
-                card_price = Decimal(card_obj.price or '0')  # 货主对接价（卡券成本）
-                min_price = Decimal(card_obj.min_price or '0') if card_obj.min_price else Decimal('0')
-                fee_payer = card_obj.fee_payer  # dealer/distributor
-                
-                # 获取系统手续费类型和数值
-                fee_type = 'fixed'
-                try:
-                    fee_type_stmt = select(SystemSetting.value).where(SystemSetting.key == 'distribution.fee_type')
-                    fee_type_result = await session.execute(fee_type_stmt)
-                    fee_type = fee_type_result.scalar() or 'fixed'
-                except Exception:
-                    pass
-                
-                fee_stmt = select(SystemSetting.value).where(SystemSetting.key == 'distribution.fee_rate')
-                fee_result = await session.execute(fee_stmt)
-                fee_val = fee_result.scalar()
-                fee_rate = Decimal(fee_val or '0')
-                
-                # 根据类型计算实际手续费金额
-                if fee_type == 'percent':
-                    # 百分比：fee_rate 是百分比值（如 5 表示 5%）
-                    fee_amount = (sale_price * fee_rate / Decimal('100')).quantize(Decimal('0.01'))
-                else:
-                    # 固定金额
-                    fee_amount = fee_rate
-                
-                # 获取对接记录
-                dock_stmt = select(DockRecord).where(DockRecord.id == dock_record_id)
-                dock_result = await session.execute(dock_stmt)
-                dock_record = dock_result.scalars().first()
-                
-                if not dock_record:
-                    self._last_delivery_fail_reason = f"对接卡券校验失败-未找到对接记录 {dock_record_id}"
-                    logger.warning(f"校验-未找到对接记录 {dock_record_id}，跳过发货")
-                    return False
-                
-                dock_level = dock_record.level
-                
-                # 获取当前用户ID（分销商/代理）
-                from common.db.compat import db_manager
-                cookie_info = db_manager.get_cookie_by_id(self.cookie_id)
-                dealer_user_id = cookie_info.get('user_id') if cookie_info else 0
-                
-                logger.info(
-                    f"📋 对接发货校验参数: 订单={order_id}, 售价={sale_price}, "
-                    f"卡券成本={card_price}, 最低售价={min_price}, "
-                    f"手续费类型={fee_type}, 手续费={fee_amount}, "
-                    f"手续费承担方={fee_payer}, 层级={dock_level}, "
-                    f"代理用户={dealer_user_id}"
-                )
-                
-                # 校验1：最低售价
-                if min_price > 0 and sale_price < min_price:
-                    self._last_delivery_fail_reason = f"对接卡券校验失败-售价低于最低售价: 售价={sale_price}, 最低售价={min_price}"
-                    logger.warning(
-                        f"❌ 对接卡券发货校验失败-售价低于最低售价: "
-                        f"订单={order_id}, 售价={sale_price}, 最低售价={min_price}"
-                    )
-                    return False
-                
-                # 校验2：根据层级检查金额是否覆盖手续费和成本
-                if dock_level == 1:
-                    # 一级代理：售价 >= 手续费 + 卡券成本
-                    required = fee_amount + card_price
-                    if sale_price < required:
-                        self._last_delivery_fail_reason = f"对接卡券校验失败-一级代理售价不足: 售价={sale_price}, 所需={required}（手续费{fee_amount} + 卡券成本{card_price}）"
-                        logger.warning(
-                            f"❌ 对接卡券发货校验失败-一级代理售价不足: "
-                            f"订单={order_id}, 售价={sale_price}, "
-                            f"所需={required}（手续费{fee_amount} + 卡券成本{card_price}）"
-                        )
-                        return False
-                    
-                    # 校验3：一级代理余额校验
-                    settlement = SettlementService(session)
-                    dealer_balance = await settlement.check_balance(dealer_user_id)
-                    if fee_payer == 'dealer':
-                        # 分销商付手续费：余额需 >= 卡券成本 + 手续费
-                        required_balance = card_price + fee_amount
-                    else:
-                        # 货主付手续费：余额需 >= 卡券成本
-                        required_balance = card_price
-                    
-                    logger.info(
-                        f"📋 一级余额校验: 代理用户={dealer_user_id}, "
-                        f"余额={dealer_balance}(type={type(dealer_balance).__name__}), "
-                        f"所需={required_balance}(type={type(required_balance).__name__}), "
-                        f"fee_payer={fee_payer}, 结果={'通过' if dealer_balance >= required_balance else '不通过'}"
-                    )
-                    
-                    if dealer_balance < required_balance:
-                        self._last_delivery_fail_reason = f"对接卡券校验失败-一级代理余额不足: 代理用户={dealer_user_id}, 当前余额={dealer_balance}, 所需余额={required_balance}"
-                        logger.warning(
-                            f"❌ 对接卡券发货校验失败-一级代理余额不足: "
-                            f"订单={order_id}, 代理用户={dealer_user_id}, "
-                            f"当前余额={dealer_balance}, 所需余额={required_balance}"
-                        )
-                        return False
-                        
-                elif dock_level == 2:
-                    # 二级代理：获取一级的 sub_dock_price 作为二级拿货价
-                    level2_cost = card_price  # 默认回退到卡券成本
-                    if dock_record.parent_dock_id:
-                        parent_stmt = select(DockRecord.sub_dock_price).where(
-                            DockRecord.id == dock_record.parent_dock_id
-                        )
-                        parent_result = await session.execute(parent_stmt)
-                        sub_dock_price = parent_result.scalar()
-                        if sub_dock_price:
-                            level2_cost = Decimal(sub_dock_price)
-                    
-                    # 售价 >= 手续费 + 二级拿货价
-                    required = fee_amount + level2_cost
-                    if sale_price < required:
-                        self._last_delivery_fail_reason = f"对接卡券校验失败-二级代理售价不足: 售价={sale_price}, 所需={required}（手续费{fee_amount} + 二级拿货价{level2_cost}）"
-                        logger.warning(
-                            f"❌ 对接卡券发货校验失败-二级代理售价不足: "
-                            f"订单={order_id}, 售价={sale_price}, "
-                            f"所需={required}（手续费{fee_amount} + 二级拿货价{level2_cost}）"
-                        )
-                        return False
-                    
-                    # 二级拿货价 >= 卡券成本（一级也要有利润空间）
-                    if level2_cost < card_price:
-                        self._last_delivery_fail_reason = f"对接卡券校验失败-二级拿货价低于卡券成本: 二级拿货价={level2_cost}, 卡券成本={card_price}"
-                        logger.warning(
-                            f"❌ 对接卡券发货校验失败-二级拿货价低于卡券成本: "
-                            f"订单={order_id}, 二级拿货价={level2_cost}, 卡券成本={card_price}"
-                        )
-                        return False
-                    
-                    # 校验3：二级代理余额校验
-                    settlement = SettlementService(session)
-                    dealer_balance = await settlement.check_balance(dealer_user_id)
-                    if fee_payer == 'dealer':
-                        # 分销商付手续费：余额需 >= 对接成本 + 手续费
-                        required_balance = level2_cost + fee_amount
-                    else:
-                        # 货主付手续费：余额需 >= 对接成本
-                        required_balance = level2_cost
-                    
-                    if dealer_balance < required_balance:
-                        self._last_delivery_fail_reason = f"对接卡券校验失败-二级代理余额不足: 代理用户={dealer_user_id}, 当前余额={dealer_balance}, 所需余额={required_balance}"
-                        logger.warning(
-                            f"❌ 对接卡券发货校验失败-二级代理余额不足: "
-                            f"订单={order_id}, 代理用户={dealer_user_id}, "
-                            f"当前余额={dealer_balance}, 所需余额={required_balance}"
-                        )
-                        return False
-                
-                logger.info(
-                    f"✅ 对接卡券发货校验通过: 订单={order_id}, 售价={sale_price}, "
-                    f"手续费={fee_amount}, 层级={dock_level}"
-                )
-                return True
-                
-        except (InvalidOperation, ValueError) as e:
-            self._last_delivery_fail_reason = f"对接卡券校验失败-金额解析异常: {str(e)}"
-            logger.error(f"校验-金额解析异常: {self._safe_str(e)}")
-            return False
-        except Exception as e:
-            self._last_delivery_fail_reason = f"对接卡券校验异常: {str(e)}"
-            logger.error(f"校验-异常: {self._safe_str(e)}")
-            return False
-
-    # ==================== 代理订单 ====================
-
-    async def _create_agent_order(self, order_id: str, item_id: str, card: dict, delivery_content: str, buyer_id: str = None):
-        """
-        创建代理订单记录并执行分润结算（对接卡券发货后调用）
-        
-        结算流程（按新规则）：
-        - 一级代理（货主付费）：一级扣卡券成本 → 货主加卡券成本 → 货主扣手续费
-        - 一级代理（分销商付费）：一级扣卡券成本 → 一级扣手续费 → 货主加卡券成本
-        - 二级代理（货主付费）：二级扣对接成本 → 一级加对接成本 → 一级扣卡券成本 → 货主加卡券成本 → 货主扣手续费
-        - 二级代理（分销商付费）：二级扣对接成本 → 二级扣手续费 → 一级加对接成本 → 一级扣卡券成本 → 货主加卡券成本
-        
-        Args:
-            order_id: 闲鱼订单号
-            item_id: 商品ID
-            card: 卡券字典（含 card_source, dock_record_id 等）
-            delivery_content: 发货内容
-            buyer_id: 买家ID
-        """
-        from common.db.session import async_session_maker
-        from common.models.agent_order import AgentOrder
-        from common.models.dock_record import DockRecord
-        from common.models.card import Card as CardModel
-        from common.models.system_setting import SystemSetting
-        from common.services.settlement_service import SettlementService
-        from decimal import Decimal, InvalidOperation
-        from sqlalchemy import select
-        
-        card_source = card.get('card_source', 'own')
-        dock_record_id = card.get('dock_record_id')
-        
-        if not dock_record_id:
-            logger.warning(f"对接卡券缺少 dock_record_id，跳过代理订单创建")
-            return
-        
-        async with async_session_maker() as session:
-            # 获取对接记录详情
-            stmt = select(DockRecord).where(DockRecord.id == dock_record_id)
-            result = await session.execute(stmt)
-            dock_record = result.scalars().first()
-            
-            if not dock_record:
-                logger.warning(f"未找到对接记录 {dock_record_id}，跳过代理订单创建")
-                return
-            
-            dock_level = dock_record.level  # 1 or 2
-            
-            # 获取卡券信息（成本价、手续费支付方）
-            card_stmt = select(CardModel).where(CardModel.id == card.get('id'))
-            card_result = await session.execute(card_stmt)
-            card_obj = card_result.scalars().first()
-            
-            card_price = card_obj.price or '0.00' if card_obj else '0.00'  # 货主的对接价（卡券成本）
-            fee_payer = card_obj.fee_payer if card_obj else None  # dealer/distributor
-            owner_user_id = card_obj.user_id if card_obj else None  # 货主用户ID
-            
-            # 获取订单售价（需要先获取，百分比手续费依赖售价）
-            sale_price = '0.00'
-            try:
-                from common.db.compat import db_manager
-                order_info = db_manager.get_order_by_id(order_id)
-                if order_info and order_info.get('amount'):
-                    sale_price = str(order_info['amount'])
-            except Exception as e:
-                logger.warning(f"获取订单售价失败: {self._safe_str(e)}")
-            
-            # 获取系统手续费类型和数值
-            fee_amount = '0'
-            try:
-                fee_type = 'fixed'
-                fee_type_stmt = select(SystemSetting.value).where(SystemSetting.key == 'distribution.fee_type')
-                fee_type_result = await session.execute(fee_type_stmt)
-                fee_type = fee_type_result.scalar() or 'fixed'
-                
-                fee_stmt = select(SystemSetting.value).where(SystemSetting.key == 'distribution.fee_rate')
-                fee_result = await session.execute(fee_stmt)
-                fee_val = fee_result.scalar()
-                fee_rate = Decimal(fee_val or '0')
-                
-                if fee_type == 'percent':
-                    # 百分比：fee_rate 是百分比值（如 5 表示 5%）
-                    fee_amount = str((Decimal(sale_price) * fee_rate / Decimal('100')).quantize(Decimal('0.01')))
-                else:
-                    # 固定金额
-                    fee_amount = str(fee_rate)
-            except Exception as e:
-                logger.warning(f"获取手续费配置失败: {self._safe_str(e)}")
-            
-            # 确定上级信息和对接价格
-            upstream_user_id = None
-            upstream_dock_record_id = None
-            level1_user_id = None  # 一级分销商（二级结算用）
-            level2_cost = '0.00'   # 二级拿货价（二级结算用）
-            dock_price = '0.00'    # 代理的实际拿货价（对接价格）
-            
-            if dock_level == 1:
-                # 一级对接：拿货价=卡券成本，上级是卡券拥有者
-                dock_price = card_price
-                upstream_user_id = owner_user_id
-            elif dock_level == 2:
-                # 二级对接：上级是一级分销商
-                upstream_user_id = dock_record.source_user_id
-                upstream_dock_record_id = dock_record.parent_dock_id
-                level1_user_id = dock_record.source_user_id
-                
-                # 获取一级的 sub_dock_price 作为二级拿货价
-                if dock_record.parent_dock_id:
-                    parent_stmt = select(DockRecord.sub_dock_price).where(
-                        DockRecord.id == dock_record.parent_dock_id
-                    )
-                    parent_result = await session.execute(parent_stmt)
-                    sub_dock_price = parent_result.scalar()
-                    level2_cost = sub_dock_price or card_price  # 回退到卡券成本
-                
-                # 二级拿货价即为对接价格
-                dock_price = level2_cost
-            
-            # 计算利润（售价 - 拿货价）
-            try:
-                profit = str(Decimal(sale_price) - Decimal(dock_price))
-            except (InvalidOperation, ValueError):
-                profit = '0.00'
-            
-            # 获取当前用户ID（分销商）
-            from common.db.compat import db_manager
-            cookie_info = db_manager.get_cookie_by_id(self.cookie_id)
-            user_id = cookie_info.get('user_id') if cookie_info else 0
-            
-            # 截断发货内容（避免过长）
-            truncated_content = delivery_content[:2000] if delivery_content else None
-            
-            # 创建代理订单记录（完整存储所有对接金额）
-            agent_order = AgentOrder(
-                user_id=user_id,
-                order_no=order_id,
-                item_id=item_id,
-                card_id=card.get('id', 0),
-                dock_record_id=dock_record_id,
-                dock_level=dock_level,
-                sale_price=sale_price,
-                dock_price=dock_price,
-                card_price=card_price,
-                level2_cost=level2_cost if dock_level == 2 else None,
-                profit=profit,
-                fee_amount=fee_amount,
-                fee_payer=fee_payer,
-                upstream_user_id=upstream_user_id,
-                upstream_dock_record_id=upstream_dock_record_id,
-                owner_user_id=owner_user_id,
-                delivery_content=truncated_content,
-                buyer_id=buyer_id,
-                status='delivered',
-            )
-            session.add(agent_order)
-            await session.flush()  # flush 先获取 ID，但不 commit
-            
-            logger.info(
-                f"✅ 代理订单已创建: order_no={order_id}, dock_level={dock_level}, "
-                f"sale={sale_price}, dock={dock_price}, card_price={card_price}, "
-                f"level2_cost={level2_cost}, fee={fee_amount}({fee_payer}), "
-                f"profit={profit}, upstream_user={upstream_user_id}, owner={owner_user_id}"
-            )
-            
-            # 执行分润结算（在同一个 session/事务中）
-            settlement = SettlementService(session)
-            
-            try:
-                if dock_level == 1 and owner_user_id:
-                    # 一级结算
-                    await settlement.settle_level1_order(
-                        order_no=order_id,
-                        dealer_user_id=user_id,
-                        owner_user_id=owner_user_id,
-                        dock_record_id=dock_record_id,
-                        agent_order_id=agent_order.id,
-                        sale_price=sale_price,
-                        card_price=card_price,
-                        fee_payer=fee_payer,
-                        fee_amount=fee_amount,
-                    )
-                    agent_order.status = 'settled'
-                    
-                elif dock_level == 2 and level1_user_id and owner_user_id:
-                    # 二级结算
-                    await settlement.settle_level2_order(
-                        order_no=order_id,
-                        dealer_user_id=user_id,
-                        level1_user_id=level1_user_id,
-                        owner_user_id=owner_user_id,
-                        dock_record_id=dock_record_id,
-                        parent_dock_record_id=upstream_dock_record_id or 0,
-                        agent_order_id=agent_order.id,
-                        sale_price=sale_price,
-                        level2_cost=level2_cost,
-                        level1_cost=card_price,
-                        fee_payer=fee_payer,
-                        fee_amount=fee_amount,
-                    )
-                    agent_order.status = 'settled'
-                    
-            except Exception as settle_err:
-                logger.error(f"分润结算失败（不影响代理订单记录）: {self._safe_str(settle_err)}")
-                agent_order.settle_remark = f'结算失败: {self._safe_str(settle_err)}'
-            
-            await session.commit()
 
     # ==================== API卡券获取 ====================
 

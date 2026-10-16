@@ -1640,8 +1640,6 @@ class OrderService:
 
     async def _fetch_refund_orders_impl(self, account) -> dict:
         """获取退款订单实际实现（调用方需已持有账号锁）"""
-        from common.services.refund_cancel_service import process_order_unregister
-
         cookies_str = account.cookie
         total_fetched = 0
         updated = 0

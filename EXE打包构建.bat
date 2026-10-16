@@ -242,6 +242,21 @@ if errorlevel 1 (
     goto :end
 )
 
+REM --- Bundle Python third-party packages (site-packages) so standalone
+REM     python.exe can run sub-services fully offline without pip install ---
+set "PACKAGED_SP=%DIST_DIR%\Lib\site-packages"
+if not exist "%PACKAGED_SP%" (
+    if exist "%PYTHON_DIR%Lib\site-packages" (
+        echo [INFO] Copying Python third-party packages (site-packages)...
+        xcopy /E /I /Y /Q "%PYTHON_DIR%Lib\site-packages" "%PACKAGED_SP%" >nul
+        echo [INFO] Python third-party packages copied to dist dir.
+    ) else (
+        echo [WARN] site-packages not found at %PYTHON_DIR%Lib\site-packages, sub-services may need to pip install online.
+    )
+) else (
+    echo [INFO] site-packages already present in dist dir, skipping.
+)
+
 REM --- Clean temp files from copies ---
 if exist "%DIST_DIR%\backend-web\logs" rmdir /s /q "%DIST_DIR%\backend-web\logs"
 if exist "%DIST_DIR%\websocket\logs" rmdir /s /q "%DIST_DIR%\websocket\logs"

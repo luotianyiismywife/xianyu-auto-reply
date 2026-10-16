@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Plus, RefreshCw, QrCode, Key, Edit2, Trash2, Power, PowerOff, X, Loader2, Clock, CheckCircle, MessageSquare, Bot, Globe, Timer, ScanFace, ChevronLeft, ChevronRight, ChevronDown, ImagePlus, Filter, Repeat, MoreHorizontal, PackageCheck, Star, ShieldCheck, Flower2, Eye, EyeOff, Ban, Download, Upload, Send, Ticket, AlertCircle, Truck } from 'lucide-react'
+import { Plus, RefreshCw, QrCode, Key, Edit2, Trash2, Power, PowerOff, X, Loader2, Clock, CheckCircle, MessageSquare, Bot, Globe, Timer, ScanFace, ChevronLeft, ChevronRight, ChevronDown, ImagePlus, Filter, Repeat, MoreHorizontal, PackageCheck, Star, ShieldCheck, Flower2, Eye, EyeOff, Ban, Download, Upload, Send, Ticket, AlertCircle } from 'lucide-react'
 import { getAccountDetailsPaginated, deleteAccount, updateAccountCookie, updateAccountStatus, updateAccountsStatusBatch, closeAccountsNoticeBatch, clearTokenCacheBatch, updateAccountRemark, addAccount, generateQRLogin, checkQRLoginStatus, passwordLogin, checkPasswordLoginStatus, cancelPasswordLogin, updateAccountAutoConfirm, updateAccountPauseDuration, updateAccountMessageExpireTime, updateAccountReplyDelay, updateAccountLoginInfo, updateAccountScheduledRedelivery, updateAccountScheduledRate, updateAccountAutoPolish, updateAccountConfirmBeforeSend, updateAccountSendBeforeConfirm, updateAccountOnlySendCard, updateAccountAutoRedFlower, updateAccountAiReplyBlockOrderedUsers, getAIReplySettings, updateAIReplySettings, testAIConnection, fetchAIModels, AI_PROVIDER_OPTIONS, AI_PROVIDER_DEFAULT_BASE_URLS, getProxyConfig, updateProxyConfig, getFaceVerificationScreenshot, deleteFaceVerificationScreenshot, getConfirmReceiptMessage, updateConfirmReceiptMessage, uploadConfirmReceiptImage, exportAccountsExcel, importAccountsExcel, type AIProviderType, type AIModelOption, type ProxyConfig, type FaceVerificationScreenshot, type AccountFilterParams } from '@/api/accounts'
 import { getDefaultReply, updateDefaultReply, uploadDefaultReplyImage } from '@/api/keywords'
 import { getAutoRateConfig, updateAutoRateConfig } from '@/api/autoRate'
@@ -9,17 +8,14 @@ import { checkAdminDefaultPassword } from '@/api/auth'
 import { getApiErrorMessage } from '@/utils/request'
 import { useUIStore } from '@/store/uiStore'
 import { useAuthStore } from '@/store/authStore'
-import { useMenuVisibilityStore } from '@/store/menuVisibilityStore'
 import { PageLoading } from '@/components/common/Loading'
 import { ConfirmModal } from '@/components/common/ConfirmModal'
 import LocationContactReplyFields, { DEFAULT_LOCATION_TITLE, type LocationContactReplyValue } from '@/pages/common/LocationContactReplyFields'
 import { getUserSetting } from '@/api/settings'
 import { DeliveryBlockRulesModal } from './DeliveryBlockRulesModal'
-import { RefundCancelModal } from './RefundCancelModal'
-import { AgreeDeliverModal } from './AgreeDeliverModal'
 import type { AccountDetail } from '@/types'
 
-type ModalType = 'qrcode' | 'password' | 'manual' | 'edit' | 'default-reply' | 'ai-settings' | 'proxy-settings' | 'message-expire-time' | 'reply-delay' | 'face-verification' | 'confirm-receipt' | 'auto-rate' | 'delivery-disabled' | 'refund-cancel' | 'agree-deliver' | null
+type ModalType = 'qrcode' | 'password' | 'manual' | 'edit' | 'default-reply' | 'ai-settings' | 'proxy-settings' | 'message-expire-time' | 'reply-delay' | 'face-verification' | 'confirm-receipt' | 'auto-rate' | 'delivery-disabled' | null
 type DefaultReplyType = 'text' | 'api' | 'external_contact'
 
 const normalizeDefaultReplyType = (replyType: unknown): DefaultReplyType => {
@@ -93,8 +89,6 @@ const getAIConfigIncompleteMessage = (missingItems: string[]): string => (
 export function Accounts() {
   const { addToast } = useUIStore()
   const { isAuthenticated, token, user, _hasHydrated } = useAuthStore()
-  const { isExeMode } = useMenuVisibilityStore()
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [accounts, setAccounts] = useState<AccountWithKeywordCount[]>([])
   const [activeModal, setActiveModal] = useState<ModalType>(null)
@@ -265,8 +259,6 @@ export function Accounts() {
 
   // 禁止发货设置状态
   const [deliveryDisabledAccount, setDeliveryDisabledAccount] = useState<AccountWithKeywordCount | null>(null)
-  const [refundCancelAccount, setRefundCancelAccount] = useState<AccountWithKeywordCount | null>(null)
-  const [agreeDeliverAccount, setAgreeDeliverAccount] = useState<AccountWithKeywordCount | null>(null)
 
   // 确认弹窗状态
   const [deleteAccountConfirm, setDeleteAccountConfirm] = useState<{ open: boolean; id: string | null }>({ open: false, id: null })
@@ -1706,18 +1698,6 @@ export function Accounts() {
     setActiveModal('delivery-disabled')
   }
 
-  // ==================== 退款订单注销设置 ====================
-  const openRefundCancelModal = (account: AccountWithKeywordCount) => {
-    setRefundCancelAccount(account)
-    setActiveModal('refund-cancel')
-  }
-
-  // ==================== 同意后发货设置 ====================
-  const openAgreeDeliverModal = (account: AccountWithKeywordCount) => {
-    setAgreeDeliverAccount(account)
-    setActiveModal('agree-deliver')
-  }
-
   const handleSaveMessageExpireTime = async () => {
     if (!messageExpireTimeAccount) return
 
@@ -2031,26 +2011,6 @@ export function Accounts() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">推荐方式</p>
               </div>
             </button>
-
-            {!isExeMode && (
-              <button
-                onClick={async () => {
-                  const passed = await checkAdminPassword()
-                  if (!passed) return
-                  navigate('/accounts/shared-scan')
-                }}
-                className="flex items-center gap-3 p-4 rounded-md border border-emerald-200 dark:border-emerald-800 
-                           bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors text-left"
-              >
-                <div className="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center flex-shrink-0">
-                  <Globe className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">兼职登录</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">在当前界面打开兼职登录页面</p>
-                </div>
-              </button>
-            )}
 
             {/* 账号密码登录 */}
             <button
@@ -2777,20 +2737,6 @@ export function Accounts() {
                     >
                       <Ban className={`w-3.5 h-3.5 ${account.delivery_disabled ? 'text-red-500' : 'text-slate-400'}`} />
                       <span className="text-slate-700 dark:text-slate-300">禁止发货设置</span>
-                    </button>
-                    <button
-                      onClick={() => { openRefundCancelModal(account); setMoreMenuAccountId(null) }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <Repeat className="w-3.5 h-3.5 text-orange-500" />
-                      <span className="text-slate-700 dark:text-slate-300">退款订单注销</span>
-                    </button>
-                    <button
-                      onClick={() => { openAgreeDeliverModal(account); setMoreMenuAccountId(null) }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <Truck className={`w-3.5 h-3.5 ${account.agree_deliver_enabled ? 'text-blue-500' : 'text-slate-400'}`} />
-                      <span className="text-slate-700 dark:text-slate-300">同意后发货</span>
                     </button>
                   </>
                 )
@@ -4332,24 +4278,6 @@ export function Accounts() {
         <DeliveryBlockRulesModal
           accountId={deliveryDisabledAccount.id}
           accountDisplayId={deliveryDisabledAccount.id}
-          onClose={closeModal}
-        />
-      )}
-
-      {/* 退款订单注销设置弹窗 */}
-      {activeModal === 'refund-cancel' && refundCancelAccount && (
-        <RefundCancelModal
-          accountId={refundCancelAccount.id}
-          accountDisplayId={refundCancelAccount.id}
-          onClose={closeModal}
-        />
-      )}
-
-      {/* 同意后发货设置弹窗 */}
-      {activeModal === 'agree-deliver' && agreeDeliverAccount && (
-        <AgreeDeliverModal
-          accountId={agreeDeliverAccount.id}
-          accountDisplayId={agreeDeliverAccount.id}
           onClose={closeModal}
         />
       )}

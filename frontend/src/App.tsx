@@ -11,14 +11,9 @@ import { useMenuVisibilityStore } from '@/store/menuVisibilityStore'
 import { applyThemeSettings, initializeThemeMode } from '@/utils/theme'
 import type { DisclaimerSettings } from '@/types'
 
-// 登录/注册/激活码页面保持同步导入（首屏必需）
+// 登录/找回密码页面保持同步导入（首屏必需）
 import { Login } from '@/pages/auth/Login'
-import { Register } from '@/pages/auth/Register'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
-import { GetActivation } from '@/pages/auth/GetActivation'
-import { RenewActivation } from '@/pages/auth/RenewActivation'
-import { GetLocalVersion } from '@/pages/auth/GetLocalVersion'
-import { GetSourceCode } from '@/pages/auth/GetSourceCode'
 
 // 页面组件懒加载，按需加载提升首屏速度
 const Dashboard = React.lazy(() => import('@/pages/dashboard/Dashboard').then(m => ({ default: m.Dashboard })))
@@ -35,10 +30,6 @@ const MessageNotifications = React.lazy(() => import('@/pages/notifications/Mess
 const Settings = React.lazy(() => import('@/pages/settings/Settings').then(m => ({ default: m.Settings })))
 const MessageFilters = React.lazy(() => import('@/pages/messageFilters/MessageFilters').then(m => ({ default: m.MessageFilters })))
 const Feedback = React.lazy(() => import('@/pages/feedback/Feedback'))
-const Announcements = React.lazy(() => import('@/pages/announcements/Announcements').then(m => ({ default: m.Announcements })))
-const PopupAnnouncements = React.lazy(() => import('@/pages/announcements/PopupAnnouncements').then(m => ({ default: m.PopupAnnouncements })))
-const AdManage = React.lazy(() => import('@/pages/advertisements/AdManage'))
-const AdApply = React.lazy(() => import('@/pages/advertisements/AdApply'))
 const Tutorial = React.lazy(() => import('@/pages/tutorial/Tutorial').then(m => ({ default: m.Tutorial })))
 const ItemSearch = React.lazy(() => import('@/pages/search/ItemSearch').then(m => ({ default: m.ItemSearch })))
 const GoofishCompass = React.lazy(() => import('@/pages/compass/GoofishCompass').then(m => ({ default: m.GoofishCompass })))
@@ -46,21 +37,6 @@ const GoofishScheduledCrawler = React.lazy(() => import('@/pages/crawler/Goofish
 const Cards = React.lazy(() => import('@/pages/cards/Cards').then(m => ({ default: m.Cards })))
 const PersonalSettings = React.lazy(() => import('@/pages/personalSettings/PersonalSettings').then(m => ({ default: m.PersonalSettings })))
 const Blacklist = React.lazy(() => import('@/pages/blacklist/Blacklist'))
-const SupplyManagement = React.lazy(() => import('@/pages/distribution/SupplyManagement').then(m => ({ default: m.SupplyManagement })))
-const DockedProducts = React.lazy(() => import('@/pages/distribution/DockedProducts').then(m => ({ default: m.DockedProducts })))
-const DealerManagement = React.lazy(() => import('@/pages/distribution/DealerManagement').then(m => ({ default: m.DealerManagement })))
-const FundFlows = React.lazy(() => import('@/pages/distribution/FundFlows').then(m => ({ default: m.FundFlows })))
-const SubDealerManagement = React.lazy(() => import('@/pages/distribution/SubDealerManagement').then(m => ({ default: m.SubDealerManagement })))
-const SourceManagement = React.lazy(() => import('@/pages/distribution/SourceManagement').then(m => ({ default: m.SourceManagement })))
-const AgentOrders = React.lazy(() => import('@/pages/distribution/AgentOrders').then(m => ({ default: m.AgentOrders })))
-const CardPickup = React.lazy(() => import('@/pages/distribution/CardPickup').then(m => ({ default: m.CardPickup })))
-
-// 共享多人扫码登录
-const SharedScanManager = React.lazy(() => import('@/pages/shared-scan/SharedScanManager').then(m => ({ default: m.SharedScanManager })))
-const SharedScanPage = React.lazy(() => import('@/pages/shared-scan/SharedScanPage').then(m => ({ default: m.SharedScanPage })))
-
-// 同意后发货 - 买家提货页（无需登录，公开访问）
-const AgreePickupPage = React.lazy(() => import('@/pages/agree-pickup/AgreePickupPage').then(m => ({ default: m.AgreePickupPage })))
 
 // 商品发布页面懒加载
 const ProductMaterials = React.lazy(() => import('@/pages/product-publish/ProductMaterials').then(m => ({ default: m.ProductMaterials })))
@@ -77,7 +53,6 @@ const OrderFallbackAccount = React.lazy(() => import('@/pages/product-monitor/Or
 const CollectFallbackAccount = React.lazy(() => import('@/pages/product-monitor/CollectFallbackAccount').then(m => ({ default: m.CollectFallbackAccount })))
 
 // 管理员页面懒加载
-const Users = React.lazy(() => import('@/pages/admin/Users').then(m => ({ default: m.Users })))
 const Logs = React.lazy(() => import('@/pages/admin/Logs').then(m => ({ default: m.Logs })))
 const AutoReplyLogs = React.lazy(() => import('@/pages/autoReplyLogs/AutoReplyLogs').then(m => ({ default: m.AutoReplyLogs })))
 const RiskLogs = React.lazy(() => import('@/pages/admin/RiskLogs').then(m => ({ default: m.RiskLogs })))
@@ -319,17 +294,8 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/get-activation" element={<GetActivation />} />
-          <Route path="/renew-activation" element={<RenewActivation />} />
-          <Route path="/get-local-version" element={<GetLocalVersion />} />
-          <Route path="/get-source-code" element={<GetSourceCode />} />
           <Route path="/about-public" element={<PublicAbout />} />
-          {/* 兼职端扫码页面：无需登录，公开访问 */}
-          <Route path="/shared-scan-page" element={<SharedScanPage />} />
-          {/* 同意后发货提货页：无需登录，公开访问 */}
-          <Route path="/agree-pickup" element={<AgreePickupPage />} />
 
           {/* Protected routes */}
           <Route
@@ -344,7 +310,6 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="data-analysis/overview" element={<DataOverview />} />
             <Route path="accounts" element={<Accounts />} />
-            <Route path="accounts/shared-scan" element={<SharedScanManager />} />
             <Route path="items" element={<Items />} />
             <Route path="orders" element={<Orders />} />
             <Route path="keywords" element={<Keywords />} />
@@ -357,19 +322,10 @@ function App() {
             <Route path="notification-channels" element={<NotificationChannels />} />
             <Route path="message-notifications" element={<MessageNotifications />} />
             <Route path="feedback" element={<Feedback />} />
-            <Route path="ad-apply" element={<AdApply />} />
             <Route path="item-search" element={<ItemSearch />} />
             <Route path="goofish-compass" element={<GoofishCompass />} />
             <Route path="goofish-scheduled-crawler" element={<GoofishScheduledCrawler />} />
             <Route path="cards" element={<Cards />} />
-            <Route path="distribution/supply" element={<SupplyManagement />} />
-            <Route path="distribution/card-pickup" element={<CardPickup />} />
-            <Route path="distribution/docked" element={<DockedProducts />} />
-            <Route path="distribution/dealers" element={<DealerManagement />} />
-            <Route path="distribution/sub-dealers" element={<SubDealerManagement />} />
-            <Route path="admin/fund-flows" element={<FundFlows />} />
-            <Route path="distribution/sources" element={<SourceManagement />} />
-            <Route path="distribution/agent-orders" element={<AgentOrders />} />
             {/* 商品发布 */}
             <Route path="product-publish/materials" element={<ProductMaterials />} />
             <Route path="product-publish/single" element={<ProductPublish />} />
@@ -387,14 +343,11 @@ function App() {
             <Route path="personal-settings" element={<PersonalSettings />} />
             <Route path="blacklist" element={<Blacklist />} />
             <Route path="settings" element={<Settings />} />
-            {/* 共享多人扫码登录管理端 */}
-            <Route path="shared-scan" element={<Navigate to="/accounts/shared-scan" replace />} />
             <Route path="disclaimer" element={<Disclaimer />} />
             <Route path="about" element={<About />} />
             <Route path="tutorial" element={<Tutorial />} />
 
             {/* Admin routes */}
-            <Route path="admin/users" element={<Users />} />
             <Route path="admin/logs" element={<Logs />} />
             <Route path="admin/account-login-logs" element={<AccountLoginLogs />} />
             <Route path="admin/user-login-logs" element={<UserLoginLogs />} />
@@ -421,9 +374,6 @@ function App() {
             <Route path="admin/red-flower-batches" element={<RedFlowerBatches />} />
             <Route path="admin/red-flower-batches/:batchId" element={<RedFlowerBatchDetailPage />} />
             <Route path="admin/scheduled-tasks" element={<ScheduledTasks />} />
-            <Route path="admin/announcements" element={<Announcements />} />
-            <Route path="admin/ad-manage" element={<AdManage />} />
-            <Route path="admin/popup-announcements" element={<PopupAnnouncements />} />
           </Route>
 
           {/* Catch all */}

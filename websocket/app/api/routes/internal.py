@@ -77,12 +77,12 @@ class DeliverOrderRequest(BaseModel):
     quantity: int = 1
 
 
-class AgreePickupDeliverRequest(BaseModel):
-    """同意后发货-提货页发货请求（内部接口，由 backend-web 公开层校验订单后调用）"""
-    order_no: str
-
-
 class ConfirmNoLogisticsRequest(BaseModel):
+    account_id: str
+    order_no: str
+    item_id: str
+    buyer_id: str = ""
+    is_bargain: bool = False
     account_id: str
     order_no: str
     item_id: str
@@ -1236,133 +1236,6 @@ async def deliver_order(request: DeliverOrderRequest):
             local_order_lock.release()
 
 
-def _agree_pickup_shipping_ok(result: dict | None) -> bool:
-    """确认发货/免拼发货结果是否可继续发卡券（成功或平台已发货均视为通过）
-
-    判定逻辑统一收敛到 common.services.delivery_utils.is_shipping_result_ok，
-    本函数仅作为同意后发货流程内的语义化别名保留。
-    """
-    from common.services.delivery_utils import is_shipping_result_ok
-
-    return is_shipping_result_ok(result)
-
-
-@router.post("/orders/agree-pickup-deliver")
-async def agree_pickup_deliver(request: AgreePickupDeliverRequest):
-    """同意后发货：买家在公开提货页点击「同意」后触发的真实发货。
-
-    流程：免拼(小刀)→确认发货（均 force=True 绕过「只发卡券/同意后发货」守卫）
-    → 取唯一自有卡券内容 → 落库并返回卡券内容供页面展示。
-    对接卡券因结算财务风险暂不支持（返回失败提示联系卖家）。
-    跨进程并发由 backend-web 的 Redis 锁保证，这里再用账号实例本地订单锁串行。
-    """
-    from app.services.xianyu.cookie_manager import get_manager
-    from common.db.compat import db_manager
-
-    order_info = db_manager.get_order_by_id(request.order_no)
-    if not order_info:
-        return {"success": False, "code": 404, "message": "订单不存在", "data": None}
-    account_id = order_info.get('account_id')
-    xianyu_live = get_manager().instances.get(account_id) if account_id else None
-    if not xianyu_live:
-        return {
-            "success": False, "code": 200,
-            "message": "卖家账号当前不在线，暂时无法发货，请稍后重试或联系卖家",
-            "data": None,
-        }
-
-    local_order_lock = xianyu_live._order_locks[request.order_no]
-    try:
-        await asyncio.wait_for(local_order_lock.acquire(), timeout=5)
-    except asyncio.TimeoutError:
-        return {"success": False, "code": 409, "message": "订单正在处理中，请稍后再试", "data": None}
-    try:
-        return await _agree_pickup_deliver_impl(xianyu_live, request.order_no)
-    finally:
-        if local_order_lock.locked():
-            local_order_lock.release()
-
-
-async def _agree_pickup_deliver_impl(xianyu_live, order_no: str):
-    """同意后发货核心流程（调用方已持有本地订单锁）"""
-    from loguru import logger
-    from common.db.compat import db_manager
-    from common.services.agree_pickup_delivery import (
-        consume_card_and_record,
-        pick_unique_own_card,
-        read_order_snapshot,
-    )
-
-    handler = xianyu_live.auto_delivery_handler
-
-    snapshot = await read_order_snapshot(order_no)
-    if not snapshot:
-        return {"success": False, "code": 404, "message": "订单不存在", "data": None}
-
-    # 幂等：已同意且已有发货内容，直接返回，不重复发货/耗卡
-    if snapshot['agree_deliver_agreed'] and snapshot['delivery_content']:
-        return {
-            "success": True, "code": 200, "message": "您已同意发货，以下为发货内容",
-            "data": {"order_no": order_no, "content": snapshot['delivery_content'], "already_agreed": True},
-        }
-
-    item_id = snapshot['item_id']
-    if not item_id:
-        return {"success": False, "code": 200, "message": "订单缺少商品信息，无法发货，请联系卖家", "data": None}
-
-    # 先选卡（存在性校验）：无可用/非自有卡券则不触发确认发货，直接提示
-    cards = db_manager.get_cards_by_item_id(item_id, snapshot['spec_name'], snapshot['spec_value'])
-    card, card_err = pick_unique_own_card(cards)
-    if card_err:
-        return {"success": False, "code": 200, "message": card_err, "data": None}
-
-    card_type = card.get('type')
-    if card_type not in ('text', 'data', 'image', 'api'):
-        return {"success": False, "code": 200, "message": f"不支持的卡券类型：{card_type}，请联系卖家", "data": None}
-
-    # 多数量：text/image 固定内容退化为 1；其余按商品「多数量发货」开关决定
-    quantity = snapshot['quantity']
-    if card_type in ('text', 'image'):
-        quantity = 1
-    elif quantity > 1:
-        try:
-            if not db_manager.get_item_multi_quantity_delivery_status(snapshot['account_id'], item_id):
-                quantity = 1
-        except Exception as e:
-            logger.warning(f"【同意后发货】查询商品多数量发货开关异常，按 1 份处理: {e}")
-            quantity = 1
-
-    # 免拼(小刀) → 确认发货（force=True 绕过 只发卡券/同意后发货 守卫，真实调用平台接口）
-    if snapshot['is_bargain']:
-        fs = await handler.auto_freeshipping(
-            order_id=order_no, item_id=item_id, buyer_id=snapshot['buyer_id'], force=True
-        )
-        if not _agree_pickup_shipping_ok(fs):
-            reason = (fs or {}).get('error') or (fs or {}).get('message') or '未知错误'
-            logger.warning(f"【同意后发货】订单 {order_no} 免拼发货失败: {reason}")
-            return {"success": False, "code": 200, "message": f"免拼发货失败，请稍后重试或联系卖家：{reason}", "data": None}
-
-    cf = await handler.auto_confirm(order_id=order_no, item_id=item_id, force=True)
-    if not _agree_pickup_shipping_ok(cf):
-        reason = (cf or {}).get('error') or (cf or {}).get('message') or '未知错误'
-        logger.warning(f"【同意后发货】订单 {order_no} 确认发货失败: {reason}")
-        return {"success": False, "code": 200, "message": f"确认发货失败，请稍后重试或联系卖家：{reason}", "data": None}
-
-    # 取卡内容 + 落库（同一事务：确认成功后再消费卡券，落库失败则整体回滚）
-    context = {
-        'order_no': order_no,
-        'buyer_id': snapshot['buyer_id'] or '',
-        'buyer_name': snapshot['buyer_fish_nick'] or '',
-    }
-    ok, msg, content = await consume_card_and_record(order_no, card.get('id'), quantity, context)
-    if not ok:
-        logger.warning(f"【同意后发货】订单 {order_no} 取卡/落库失败: {msg}")
-        return {"success": False, "code": 200, "message": msg, "data": None}
-
-    logger.info(f"【同意后发货】订单 {order_no} 买家已同意，发货完成，卡券内容已生成")
-    return {"success": True, "code": 200, "message": msg, "data": {"order_no": order_no, "content": content}}
-
-
 async def _deliver_order_impl(request: DeliverOrderRequest):
     """
     订单发货接口
@@ -1928,24 +1801,6 @@ async def _deliver_order_impl(request: DeliverOrderRequest):
                 quantity = 1
                 quantity_degraded_for_disabled_switch = True
 
-        # 对接卡券（dock_l1/dock_l2）多数量发货安全门：强制退化为 1 张
-        # 原因：底层 _create_agent_order + settlement_service 是按"1 笔订单 1 笔代理订单"的语义实现，
-        # 循环 N 次调用会触发以下已知金额 bug：
-        #   1. 手续费按"卡密"重复扣 N 次（应按订单只扣 1 次）—— 资损货主
-        #   2. _validate_dock_delivery 余额校验只算单张，循环到 2~N 张可能扣款失败但卡密已发出
-        #   3. agent_order.sale_price 每笔都记订单总价 → 后台聚合销售额虚增 (N-1)/N 倍
-        #   4. agent_order.profit 每笔都记 (总价 - 单价) → 利润字段失真
-        # 短期防御：对接卡券的多数量订单退化为 1 张，并在响应里带 quantity_degraded_for_dock_card 标记，
-        # 由调用方提示商家手动拆单或改用自有卡券；待财务结算逻辑改造后再放开。
-        quantity_degraded_for_dock = False
-        if quantity > 1 and card_source in ('dock_l1', 'dock_l2'):
-            logger.warning(
-                f"【内部API】订单 {request.order_no} 对接卡券暂不支持多数量发货，"
-                f"已退化为 1 张（quantity={quantity} -> 1，card_source={card_source}）"
-            )
-            quantity = 1
-            quantity_degraded_for_dock = True
-
         # text/image 固定内容卡券多数量发货安全门：强制退化为 1 张
         # 原因：text 类型每次返回相同 card.text_content，image 类型每次返回相同 card.image_url，
         # 循环 N 次只是把同一段话/同一张图重复发 N 次，业务上无意义且会打扰买家。
@@ -2281,8 +2136,7 @@ async def _deliver_order_impl(request: DeliverOrderRequest):
         # - card_only：订单已被关闭，pre_check 已写入"禁止发货原因"，本处不应覆盖也不应追加
         # internal API 这里只处理"非退化的部分异常"，避免重复写入或意外打扰。
         if (
-            not quantity_degraded_for_dock
-            and not quantity_degraded_for_fixed_content
+            not quantity_degraded_for_fixed_content
             and not quantity_degraded_for_disabled_switch
             and not closed_order_card_only
         ):
@@ -2405,13 +2259,7 @@ async def _deliver_order_impl(request: DeliverOrderRequest):
                     )
 
         # ============ 返回响应 ============
-        if quantity_degraded_for_dock:
-            # 对接卡券退化提示：商家需要明确知道本次只发了 1 张
-            success_msg = (
-                f"对接卡券暂不支持多数量发货，已发送 1 张（订单数量为 {request.quantity} 张）。"
-                f"请手动补发剩余卡密，或拆分订单/改用自有卡券"
-            )
-        elif quantity_degraded_for_fixed_content:
+        if quantity_degraded_for_fixed_content:
             # text/image 固定内容卡券退化提示：建议商家改用 data/api 类型
             success_msg = (
                 f"固定内容卡券（{card.type} 类型）不支持多数量发货，已发送 1 张固定内容"
@@ -2476,7 +2324,7 @@ async def _deliver_order_impl(request: DeliverOrderRequest):
             "quantity_sent": actual_count,
             # 对接卡券多数量退化标记：True 表示原本订单 quantity>1 但因对接卡券强制退化为 1 张,
             # 调用方应据此向商家提示：手动补发剩余/拆单/改用自有卡券。
-            "quantity_degraded_for_dock_card": quantity_degraded_for_dock,
+            "quantity_degraded_for_fixed_content": quantity_degraded_for_fixed_content,
             # text/image 固定内容卡券多数量退化标记：True 表示原本订单 quantity>1 但因卡券类型固定退化为 1 张,
             # 调用方应据此向商家提示：改用 data/api 类型卡券支持多数量。
             "quantity_degraded_for_fixed_content": quantity_degraded_for_fixed_content,

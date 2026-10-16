@@ -1,12 +1,10 @@
 """
-GUI启动器界面
+GUI启动器界面（免激活版）
 
 功能：
-1. 显示机器码，支持一键复制
-2. 输入激活码并验证
-3. 激活后显示MySQL/Redis配置表单
-4. 验证连接成功后保存配置并启动所有服务
-5. 显示各服务运行状态
+1. 直接显示MySQL/Redis配置表单
+2. 验证连接成功后保存配置并启动所有服务
+3. 显示各服务运行状态
 """
 import sys
 import threading
@@ -15,15 +13,6 @@ import tkinter.messagebox as messagebox
 import tkinter.ttk as ttk
 from pathlib import Path
 
-from launcher.hardware_id import generate_machine_id
-from launcher.activation import (
-    verify_activation_code,
-    renew_license,
-    save_license,
-    load_and_verify_license,
-    format_expire_time,
-    get_remaining_text,
-)
 from launcher.db_checker import check_mysql_connection, check_redis_connection
 from launcher.config_store import save_connection_config, load_connection_config
 from launcher.service_manager import ServiceManager
@@ -36,13 +25,14 @@ from launcher.gui_theme import (
 )
 from launcher.gui_running import show_running_page
 from launcher.browser_setup import check_and_install_chromium, is_chromium_installed
+from launcher.browser_window import open_browser_window, close_window
 
 
 class LauncherApp:
     """
     启动器主界面类
     
-    管理激活流程、配置填写、服务启动的完整生命周期
+    管理配置填写、服务启动的完整生命周期
     使用蓝白主题，现代化卡片式布局
     """
     
@@ -68,9 +58,6 @@ class LauncherApp:
         from launcher.frozen_detect import get_project_root
         self.project_root = get_project_root()
         
-        # 生成机器码
-        self.machine_id = generate_machine_id()
-        
         # 服务管理器
         self.service_manager = ServiceManager(self.project_root)
         
@@ -80,11 +67,8 @@ class LauncherApp:
         # 样式配置
         self._setup_styles()
         
-        # 异步加载窗口图标（微信公众号二维码）
-        self._load_window_icon()
-        
-        # 根据激活状态决定显示哪个页面
-        self._check_and_show_page()
+        # 直接进入配置页面（免激活）
+        self._show_config_page()
         
         # 关闭窗口时停止所有服务
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -93,211 +77,10 @@ class LauncherApp:
         """配置ttk样式主题（委托给gui_theme模块）"""
         setup_styles()
     
-    def _load_window_icon(self):
-        """异步下载微信公众号图片并设置为窗口图标和任务栏图标"""
-        def _download():
-            try:
-                import gzip
-                import io
-                import tempfile
-                import urllib.request
-                url = "https://xy.zhinianboke.com/static/qrcode/wechat-official-group.jpg"
-                req = urllib.request.Request(url)
-                req.add_header("User-Agent", "XianyuAutoReply-GUI")
-                req.add_header("Accept-Encoding", "gzip, deflate")
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    raw = resp.read()
-                if raw[:2] == b'\x1f\x8b':
-                    raw = gzip.decompress(raw)
-                from PIL import Image
-                img = Image.open(io.BytesIO(raw))
-                # 生成多尺寸ico文件（Windows任务栏需要ico格式）
-                ico_path = Path(tempfile.gettempdir()) / "xianyu_icon.ico"
-                sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
-                img.save(str(ico_path), format="ICO", sizes=sizes)
-                self.root.after(0, lambda: self._set_icon(ico_path, img))
-            except Exception:
-                pass
-        threading.Thread(target=_download, daemon=True).start()
-    
-    def _set_icon(self, ico_path, pil_img):
-        """
-        在主线程中设置窗口图标和任务栏图标
-
-        Windows下仅使用iconbitmap（.ico文件），可同时覆盖标题栏和任务栏图标。
-        """
-        try:
-            self.root.iconbitmap(str(ico_path))
-        except Exception:
-            # 回退到iconphoto（仅标题栏生效）
-            try:
-                from PIL import ImageTk
-                photo = ImageTk.PhotoImage(pil_img.resize((48, 48)))
-                self._icon_photo = photo
-                self.root.iconphoto(True, photo)
-            except Exception:
-                pass
-    
     def _clear_page(self):
         """清除当前页面所有组件"""
         for widget in self.root.winfo_children():
             widget.destroy()
-    
-    def _check_and_show_page(self):
-        """检查激活状态并显示对应页面"""
-        result = load_and_verify_license(self.machine_id)
-        if result["valid"]:
-            self._show_config_page()
-        else:
-            self._show_activation_page(result["message"])
-    
-    # ==================== 激活页面 ====================
-    
-    def _show_activation_page(self, hint_message: str = ""):
-        """
-        显示激活页面
-        
-        Args:
-            hint_message: 页面顶部的提示信息
-        """
-        self._clear_page()
-        self._current_page = "activation"
-        
-        container = tk.Frame(self.root, bg=_COLORS["bg"])
-        container.pack(fill=tk.BOTH, expand=True)
-        
-        # 页面标题
-        make_header(container, "闲鱼自动回复系统", "请先完成软件激活")
-        
-        # 提示信息
-        if hint_message:
-            hint_card = tk.Frame(container, bg=_COLORS["warning_bg"], padx=12, pady=8)
-            hint_card.pack(fill=tk.X, padx=20, pady=(0, 12))
-            tk.Label(hint_card, text=f"  {hint_message}",
-                     font=("微软雅黑", 9), fg="#92400e", bg=_COLORS["warning_bg"],
-                     anchor=tk.W).pack(fill=tk.X)
-        
-        # 机器码卡片
-        id_card = make_card(container)
-        tk.Label(id_card, text="机器码", font=("微软雅黑", 11, "bold"),
-                 fg=_COLORS["primary"], bg=_COLORS["card_bg"]).pack(anchor=tk.W)
-        tk.Label(id_card, text="请将以下机器码发送给管理员获取激活码或续期码",
-                 font=("微软雅黑", 9), fg=_COLORS["text_secondary"],
-                 bg=_COLORS["card_bg"]).pack(anchor=tk.W, pady=(2, 8))
-        
-        # 机器码显示行
-        id_row = tk.Frame(id_card, bg=_COLORS["card_bg"])
-        id_row.pack(fill=tk.X)
-        
-        self._machine_id_var = tk.StringVar(value=self.machine_id)
-        machine_entry = ttk.Entry(
-            id_row, textvariable=self._machine_id_var,
-            state="readonly", font=("Consolas", 12), justify=tk.CENTER,
-        )
-        machine_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        
-        ttk.Button(id_row, text="复制机器码", style="Normal.TButton",
-                   command=self._copy_machine_id).pack(side=tk.RIGHT)
-        
-        # 激活码卡片
-        act_card = make_card(container)
-        tk.Label(act_card, text="激活码 / 续期码", font=("微软雅黑", 11, "bold"),
-                 fg=_COLORS["primary"], bg=_COLORS["card_bg"]).pack(anchor=tk.W)
-        tk.Label(act_card, text="请输入管理员提供的激活码或续期码",
-                 font=("微软雅黑", 9), fg=_COLORS["text_secondary"],
-                 bg=_COLORS["card_bg"]).pack(anchor=tk.W, pady=(2, 8))
-        
-        self._activation_var = tk.StringVar()
-        ttk.Entry(
-            act_card, textvariable=self._activation_var,
-            font=("Consolas", 12), justify=tk.CENTER,
-        ).pack(fill=tk.X)
-        
-        # 激活按钮
-        btn_area = tk.Frame(container, bg=_COLORS["bg"])
-        btn_area.pack(fill=tk.X, padx=20, pady=(4, 0))
-        ttk.Button(btn_area, text="进入系统", style="Primary.TButton",
-                   command=self._do_activate).pack(fill=tk.X, ipady=2)
-        
-        # 状态标签
-        self._activation_status_var = tk.StringVar()
-        self._activation_status_label = tk.Label(
-            container, textvariable=self._activation_status_var,
-            font=("微软雅黑", 10), fg=_COLORS["text_secondary"], bg=_COLORS["bg"],
-        )
-        self._activation_status_label.pack(pady=(10, 0))
-
-        # 获取激活码地址提示
-        act_url_frame = tk.Frame(container, bg="#EFF6FF", padx=12, pady=8)
-        act_url_frame.pack(fill=tk.X, padx=20, pady=(10, 0))
-        tk.Label(act_url_frame, text="🔑 获取激活码：", font=("微软雅黑", 9),
-                 fg=_COLORS["text"], bg="#EFF6FF").pack(side=tk.LEFT)
-        act_url = "https://xy.zhinianboke.com/get-activation"
-        act_url_lbl = tk.Label(act_url_frame, text=act_url,
-                               font=("Consolas", 9, "underline"),
-                               fg=_COLORS["primary"], bg="#EFF6FF", cursor="hand2")
-        act_url_lbl.pack(side=tk.LEFT)
-        act_url_lbl.bind("<Button-1>",
-                         lambda e: __import__("webbrowser").open(act_url))
-
-        renew_url_frame = tk.Frame(container, bg="#ECFDF5", padx=12, pady=8)
-        renew_url_frame.pack(fill=tk.X, padx=20, pady=(8, 0))
-        tk.Label(renew_url_frame, text="♻ 获取续期码：", font=("微软雅黑", 9),
-                 fg=_COLORS["text"], bg="#ECFDF5").pack(side=tk.LEFT)
-        renew_url = "https://xy.zhinianboke.com/renew-activation"
-        renew_url_lbl = tk.Label(renew_url_frame, text=renew_url,
-                                 font=("Consolas", 9, "underline"),
-                                 fg=_COLORS["success"], bg="#ECFDF5", cursor="hand2")
-        renew_url_lbl.pack(side=tk.LEFT)
-        renew_url_lbl.bind("<Button-1>",
-                           lambda e: __import__("webbrowser").open(renew_url))
-    
-    def _copy_machine_id(self):
-        """复制机器码到剪贴板"""
-        self.root.clipboard_clear()
-        self.root.clipboard_append(self.machine_id)
-        self._activation_status_var.set("机器码已复制到剪贴板")
-        self._activation_status_label.configure(fg=_COLORS["success"])
-
-    def _do_activate(self):
-        """执行激活操作：验证激活码签名和有效期，保存后跳转配置页"""
-        code = self._activation_var.get().strip()
-        if not code:
-            self._activation_status_var.set("请输入激活码或续期码")
-            self._activation_status_label.configure(fg=_COLORS["error"])
-            return
-
-        if code.upper().startswith("R"):
-            renew_result = renew_license(self.machine_id, code)
-            if renew_result["success"]:
-                self._activation_status_var.set(renew_result["message"])
-                self._activation_status_label.configure(fg=_COLORS["success"])
-                self.root.after(800, self._show_config_page)
-            else:
-                self._activation_status_var.set(renew_result["message"])
-                self._activation_status_label.configure(fg=_COLORS["error"])
-            return
-
-        result = verify_activation_code(self.machine_id, code)
-        if not result["valid"]:
-            self._activation_status_var.set("激活码无效，请检查后重试")
-            self._activation_status_label.configure(fg=_COLORS["error"])
-            return
-
-        if result["expired"]:
-            expire_str = format_expire_time(result["expire_ts"])
-            self._activation_status_var.set(f"激活码已过期（{expire_str}），可输入续期码继续进入系统")
-            self._activation_status_label.configure(fg=_COLORS["error"])
-            return
-
-        if save_license(self.machine_id, code, result["expire_ts"]):
-            expire_str = format_expire_time(result["expire_ts"])
-            self._activation_status_var.set(f"激活成功！到期时间: {expire_str}")
-            self._activation_status_label.configure(fg=_COLORS["success"])
-            self.root.after(800, self._show_config_page)
-        else:
-            self._activation_status_var.set("激活信息保存失败，请检查磁盘权限")
-            self._activation_status_label.configure(fg=_COLORS["error"])
     
     # ==================== 配置页面 ====================
     
@@ -342,7 +125,7 @@ class LauncherApp:
             ("mysql_port", "端口", "3306"),
             ("mysql_user", "用户名", "root"),
             ("mysql_password", "密码", ""),
-            ("mysql_database", "数据库名", "xianyu_auto_reply"),
+            ("mysql_database", "数据库名", "xianyu_data"),
         ]
         build_form_fields(mysql_card, mysql_fields, self._mysql_vars, saved_config)
         
@@ -677,7 +460,9 @@ class LauncherApp:
     def _show_running_page(self, start_results: dict):
         """显示服务运行状态页面（委托给gui_running模块）"""
         show_running_page(self, start_results)
-    
+        # 服务启动后自动用内置 Chromium 打开本地后台窗口
+        self.root.after(1500, lambda: open_browser_window())
+
     def _on_close(self):
         """
         窗口关闭事件处理
@@ -687,6 +472,7 @@ class LauncherApp:
         if self._current_page == "running":
             if not messagebox.askyesno("确认", "关闭窗口将停止所有服务，确定要退出吗？"):
                 return
+        close_window()
         self.service_manager.stop_all()
         self.root.destroy()
     

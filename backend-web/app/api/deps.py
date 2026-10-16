@@ -183,9 +183,3 @@ async def get_blacklist_service(session: AsyncSession = Depends(get_db_session))
     """获取黑名单服务"""
     from app.services.blacklist_service import BlacklistService
     return BlacklistService(session)
-
-
-async def get_card_dock_service(session: AsyncSession = Depends(get_db_session)):
-    """获取分销卡券对接服务"""
-    from app.services.card_dock_service import CardDockService
-    return CardDockService(session)

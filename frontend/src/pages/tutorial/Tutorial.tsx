@@ -30,7 +30,6 @@ import {
   Filter,
   MessageSquarePlus,
   Repeat,
-  Megaphone,
   Star,
   Timer,
   ScrollText,
@@ -268,18 +267,6 @@ const tutorialData: TutorialSection[] = [
         description: '查看和管理系统定时任务的执行状态。',
         children: [
           { id: 'tasks-run', title: '立即执行', description: '手动触发定时任务。' },
-        ],
-      },
-      {
-        id: 'admin-announcements',
-        icon: Megaphone,
-        title: '公告管理',
-        description: '发布和管理系统公告。',
-        children: [
-          { id: 'announcements-add', title: '添加公告', description: '发布新的系统公告。' },
-          { id: 'announcements-edit', title: '编辑', description: '修改公告内容。' },
-          { id: 'announcements-delete', title: '删除', description: '删除公告。' },
-          { id: 'announcements-toggle', title: '启用/禁用', description: '切换公告的显示状态。' },
         ],
       },
       {

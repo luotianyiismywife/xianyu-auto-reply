@@ -134,8 +134,6 @@ class CardService:
         Returns:
             包含分页数据的字典
         """
-        from common.models.dock_record import DockRecord
-
         base_conditions = [Card.is_dockable == True, Card.enabled == True]
         if search:
             base_conditions.append(
@@ -147,29 +145,12 @@ class CardService:
         if card_type:
             base_conditions.append(Card.type == card_type)
 
-        # dock_visibility 过滤：管理员不受限制，普通用户按可见性过滤
+        # dock_visibility 过滤：单用户自用版无分销对接，所有人可见 public/未设置的卡券
         if not is_admin:
-            # 查出当前用户通过对接码绑定的供应商ID列表
-            from common.models.dock_code_binding import DockCodeBinding
-            binding_stmt = (
-                select(DockCodeBinding.target_user_id)
-                .where(DockCodeBinding.user_id == current_user_id)
+            visibility_condition = or_(
+                Card.dock_visibility == None,
+                Card.dock_visibility == 'public',
             )
-            binding_result = await self.session.execute(binding_stmt)
-            bound_owner_ids = [row[0] for row in binding_result.all()]
-
-            # 可见条件：public 的所有人可见，dealer_only 的仅已绑定对接码的供应商卡券可见
-            if bound_owner_ids:
-                visibility_condition = or_(
-                    Card.dock_visibility == None,
-                    Card.dock_visibility == 'public',
-                    and_(Card.dock_visibility == 'dealer_only', Card.user_id.in_(bound_owner_ids)),
-                )
-            else:
-                visibility_condition = or_(
-                    Card.dock_visibility == None,
-                    Card.dock_visibility == 'public',
-                )
             base_conditions.append(visibility_condition)
 
         # 查询总数
@@ -189,18 +170,8 @@ class CardService:
         result = await self.session.execute(data_stmt)
         cards = result.scalars().all()
 
-        # 查询当前用户对这些卡券的对接记录（card_id -> dock_record_id）
-        card_ids = [c.id for c in cards]
+        # 单用户自用版无分销对接，无对接记录
         docked_map: Dict[int, int] = {}
-        if card_ids:
-            dock_stmt = select(DockRecord.card_id, DockRecord.id).where(
-                DockRecord.user_id == current_user_id,
-                DockRecord.card_id.in_(card_ids),
-                DockRecord.level == 1,
-            )
-            dock_result = await self.session.execute(dock_stmt)
-            for row in dock_result.all():
-                docked_map[row[0]] = row[1]
         
         total_pages = (total + page_size - 1) // page_size if total > 0 else 0
         

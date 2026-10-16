@@ -45,10 +45,8 @@ const routeTitles: Record<string, string> = {
   '/online-chat': '在线聊天',
   '/online-chat-new': '在线聊天',
   '/feedback': '意见反馈',
-  '/ad-apply': '广告申请',
   '/disclaimer': '免责声明',
   '/tutorial': '使用教程',
-  '/admin/users': '用户管理',
   '/admin/logs': '系统日志',
   '/admin/auto-reply-logs': '消息日志',
   '/admin/account-login-logs': '账号登录日志',
@@ -64,21 +62,9 @@ const routeTitles: Record<string, string> = {
   '/admin/close-notice-batches': '消息通知关闭日志',
   '/admin/db-backup-logs': '数据库备份日志',
   '/admin/scheduled-tasks': '定时任务',
-  '/admin/announcements': '公告管理',
-  '/admin/ad-manage': '广告管理',
   '/about': '关于',
   '/personal-settings': '个人设置',
   '/cards': '卡券管理',
-  '/distribution/supply': '货源广场',
-  '/distribution/card-pickup': '分销卡券',
-  '/distribution/sources': '货源管理',
-  '/distribution/docked': '对接的商品',
-  '/distribution/dealers': '分销商管理',
-  '/distribution/sub-dealers': '下级分销商',
-  '/admin/fund-flows': '资金流水',
-  '/distribution/agent-orders': '代理订单',
-  '/accounts/shared-scan': '共享扫码登录',
-  '/shared-scan': '共享扫码登录',
   '/product-publish/materials': '素材库',
   '/product-publish/single': '单品发布',
   '/product-publish/batch': '批量发布',
@@ -94,7 +80,6 @@ const routeTitles: Record<string, string> = {
   '/blacklist': '黑名单管理',
 }
 
-const hiddenAliasPaths = new Set(['/shared-scan'])
 
 export const useTabsStore = create<TabsStore>()(
   persist(
@@ -191,7 +176,7 @@ export function TabsBar() {
   })
   const menuRef = useRef<HTMLDivElement>(null)
   const isAdmin = Boolean(user?.is_admin)
-  const visibleTabs = tabs.filter((tab) => !hiddenAliasPaths.has(tab.path) && !isPathBlockedForUser(tab.path, hiddenMenuKeys, isAdmin, isExeMode))
+  const visibleTabs = tabs.filter((tab) => !isPathBlockedForUser(tab.path, hiddenMenuKeys, isAdmin, isExeMode))
 
   // 监听路由变化，自动添加标签
   useEffect(() => {
@@ -208,7 +193,7 @@ export function TabsBar() {
   }, [location.pathname])
 
   useEffect(() => {
-    const blockedTabs = tabs.filter((tab) => tab.path !== '/dashboard' && (hiddenAliasPaths.has(tab.path) || isPathBlockedForUser(tab.path, hiddenMenuKeys, isAdmin, isExeMode)))
+    const blockedTabs = tabs.filter((tab) => tab.path !== '/dashboard' && isPathBlockedForUser(tab.path, hiddenMenuKeys, isAdmin, isExeMode))
     if (blockedTabs.length === 0) {
       return
     }

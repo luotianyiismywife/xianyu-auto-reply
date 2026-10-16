@@ -202,8 +202,6 @@ services:
       - AUTO_START_CRAWL_JOBS=${AUTO_START_CRAWL_JOBS:-true}
       - REMOTE_OFFICIAL_BASE_URL=${REMOTE_OFFICIAL_BASE_URL:-https://xy.zhinianboke.com}
       - ENABLE_REMOTE_ADS=${ENABLE_REMOTE_ADS:-true}
-      - ENABLE_REMOTE_ANNOUNCEMENTS=${ENABLE_REMOTE_ANNOUNCEMENTS:-true}
-      - ENABLE_REMOTE_POPUP_ANNOUNCEMENTS=${ENABLE_REMOTE_POPUP_ANNOUNCEMENTS:-true}
       - BROWSER_HEADLESS=true
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - SQL_ECHO=${SQL_ECHO:-false}
@@ -492,10 +490,6 @@ AUTO_START_CRAWL_JOBS=true
 REMOTE_OFFICIAL_BASE_URL=https://xy.zhinianboke.com
 # 是否启用远程官方广告合并展示（官方服务器自身部署建议设为 false）
 ENABLE_REMOTE_ADS=true
-# 是否启用远程官方公告合并展示（官方服务器自身部署建议设为 false）
-ENABLE_REMOTE_ANNOUNCEMENTS=true
-# 是否启用远程官方弹窗公告合并展示（官方服务器自身部署建议设为 false）
-ENABLE_REMOTE_POPUP_ANNOUNCEMENTS=true
 ENVEOF
         echo -e "${GREEN}✓ 已生成 .env 文件${NC}"
         echo ""

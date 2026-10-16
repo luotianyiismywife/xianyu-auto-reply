@@ -640,15 +640,7 @@ class RedeliveryTask:
                     # 多数量退化提示：订单 quantity>1 但因卡券类型限制只发了 1 张，
                     # 把提示写入 delivery_fail_reason 让商家在订单列表看到原因
                     degraded_warn_msg: Optional[str] = None
-                    if result_data.get('quantity_degraded_for_dock_card'):
-                        # 对接卡券退化：建议手动补发或改用自有卡券
-                        requested = result_data.get('quantity_requested') or order.quantity or 1
-                        sent = result_data.get('quantity_sent') or 1
-                        degraded_warn_msg = (
-                            f"⚠️ 对接卡券暂不支持多数量发货：订单数量 {requested} 张，"
-                            f"已自动发送 {sent} 张，剩余 {max(requested - sent, 0)} 张请手动补发或改用自有卡券"
-                        )
-                    elif result_data.get('quantity_degraded_for_fixed_content'):
+                    if result_data.get('quantity_degraded_for_fixed_content'):
                         # text/image 固定内容卡券退化：建议改用 data/api 类型
                         requested = result_data.get('quantity_requested') or order.quantity or 1
                         sent = result_data.get('quantity_sent') or 1

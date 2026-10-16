@@ -1419,11 +1419,6 @@ class XianyuAsync:
                         f"已建档为退款中(refunding)"
                     )
 
-            # 触发退款订单注销（统一逻辑，与定时任务共用）：
-            # 内部判断账号开关、发货内容为空标记、已注销跳过，不阻塞主流程
-            from common.services.refund_cancel_service import process_order_unregister
-            asyncio.create_task(process_order_unregister(self.cookie_id, order_id))
-
             # 订单原本不存在 → 异步拉取订单详情补全（规格/收货人/金额等，不会覆盖 status）
             if not order_existed:
                 asyncio.create_task(self._fetch_order_detail_async(order_id, item_id, buyer_id))

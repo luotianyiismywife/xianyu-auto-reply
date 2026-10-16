@@ -1015,32 +1015,6 @@ class DatabaseInitializer:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定时补发货执行日志表';
         """,
 
-        # 22. 公告信息表
-        "xy_announcements": """
-            CREATE TABLE IF NOT EXISTS xy_announcements (
-                id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
-                title VARCHAR(200) NOT NULL COMMENT '公告标题',
-                content TEXT NOT NULL COMMENT '公告内容',
-                is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已删除',
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告信息表';
-        """,
-
-        # 22.1 弹窗公告表（用户每次登录时弹窗展示）
-        "xy_popup_announcements": """
-            CREATE TABLE IF NOT EXISTS xy_popup_announcements (
-                id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '弹窗公告ID',
-                title VARCHAR(200) NOT NULL COMMENT '公告标题',
-                content TEXT NOT NULL COMMENT '公告内容',
-                link VARCHAR(500) NULL COMMENT '跳转链接',
-                is_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
-                is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已删除',
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='弹窗公告表';
-        """,
-
         # 23. 确认收货消息表
         "xy_confirm_receipt_messages": """
             CREATE TABLE IF NOT EXISTS xy_confirm_receipt_messages (
@@ -2168,9 +2142,6 @@ class DatabaseInitializer:
             ("ai_prompt", "TEXT COMMENT '商品AI提示词'", "price"),
             ("is_polished", "TINYINT(1) DEFAULT 0 COMMENT '是否擦亮'", "ai_prompt"),
             ("updated_at", "DATETIME COMMENT '更新时间'", "created_at"),
-        ],
-        "xy_announcements": [
-            ("is_deleted", "TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已删除'", "content"),
         ],
         "xy_card_item_relations": [
             ("source", "VARCHAR(20) DEFAULT 'own' COMMENT '卡券来源：own-自有，dock_l1-一级对接，dock_l2-二级对接'", "item_id"),
