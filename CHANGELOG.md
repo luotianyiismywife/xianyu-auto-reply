@@ -7,6 +7,28 @@
 
 ---
 
+## [free-1.0.1] - 2026-10-17
+
+清理上一版遗留的商用 / 分销死代码。
+
+### 删除
+
+- **死枚举**：`withdraw_notification`（提现通知邮件，提现功能已删）
+- **死表（10 张）**：`xy_advertisements`、`xy_dock_records`、`xy_fund_flows`、`xy_recharge_orders`、`xy_dock_code_bindings`、`xy_agent_orders`、`xy_settlement_records`、`xy_activation_logs`、`xy_shared_scan_sessions`、`xy_shared_scan_workers`
+- **死表配套迁移**：上述表的字段迁移、索引迁移、枚举迁移条目
+- **死前端类型**：`alipay.*`、`withdraw.*`、`user.renew_month_price`
+
+### 修正
+
+- `selectable_card_service.py` 过时文档字符串（仍描述"自有卡券 + 对接卡券合并分页"）
+
+### 说明
+
+- 已删除的表在旧库中仍会残留（`CREATE TABLE IF NOT EXISTS` 不会删表），如需彻底清理请手动 `DROP TABLE`
+- 以下"灰色地带"暂未处理（代码仍有引用，删除需较大重构）：`xy_cards` 的 `is_dockable`/`fee_payer`/`min_price`/`dock_visibility` 列、`xy_card_item_relations` 的 `source`/`dock_record_id` 列、`xy_users` 的 `dock_code`/`expire_at` 列
+
+---
+
 ## [free-1.0.0] - 2026-10-17
 
 首个自用精简发行版。

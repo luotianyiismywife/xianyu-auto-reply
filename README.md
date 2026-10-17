@@ -54,7 +54,7 @@ git diff feature/free-launcher upstream/main -- <文件>     # 评估可继承�
 
 ### 更新日志
 
-各发行版变更详见 [CHANGELOG.md](CHANGELOG.md)。当前版本：**free-1.0.0**。
+各发行版变更详见 [CHANGELOG.md](CHANGELOG.md)。当前版本：**free-1.0.1**。
 
 ## 功能概览
 

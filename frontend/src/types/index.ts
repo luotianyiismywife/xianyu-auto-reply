@@ -292,15 +292,6 @@ export interface SystemSettings {
   // 模块设置
   'distribution.fee_type'?: string  // fixed-固定金额, percent-百分比
   'distribution.fee_rate'?: string
-  // 支付宝配置
-  'alipay.app_id'?: string
-  'alipay.private_key'?: string
-  'alipay.alipay_public_key'?: string
-  'alipay.gateway_url'?: string
-  'alipay.notify_url'?: string
-  // 提现配置
-  'withdraw.notify_email'?: string
-  'withdraw.min_amount'?: string
   // 日志配置
   'log.retention_days'?: string
   // 账号安全设置
@@ -317,8 +308,7 @@ export interface SystemSettings {
   // 代理设置
   'proxy.api_url'?: string
   'proxy.enabled'?: boolean
-  // 用户到期/续期设置
-  'user.renew_month_price'?: string
+  // 用户注册设置
   'user.register_default_days'?: string
   [key: string]: unknown
 }
