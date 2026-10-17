@@ -46,8 +46,7 @@ class RelistAssociationMigrationService:
         source_type: str | None = None,
     ) -> dict[str, Any]:
         """执行续售后关联迁移并返回每一步状态。"""
-        # 当前自动续售入口只处理商品素材；保留 source_type 参数以兼容返佣素材
-        # 后置扩展，但没有明确来源映射时不改写 FYMaterial，避免误关联返佣数据。
+        # 当前自动续售入口只处理商品素材。
         del material_id, source_type
         account = (
             await self.session.execute(

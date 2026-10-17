@@ -18,7 +18,7 @@ from types import ModuleType
 def _prepare_backend_web_package_paths(source_path: Path) -> None:
     """让动态加载的 backend-web 模块能够解析其 ``app`` 包内依赖。
 
-    scheduler、websocket 和 promotion 都有各自的 ``app`` 包。共享层从这些
+    scheduler 和 websocket 都有各自的 ``app`` 包。共享层从这些
     服务调用动态加载器时，Python 可能已经把其他服务的 ``app.services``
     加载进 sys.modules，导致 backend-web 的同名模块无法被发现。将
     backend-web 的包目录加入已加载包的搜索路径即可保持各服务隔离，同时

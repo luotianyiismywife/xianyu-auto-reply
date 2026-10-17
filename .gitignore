@@ -71,8 +71,6 @@ dmypy.json
 **/node_modules.zip
 /frontend/dist/
 /frontend/build/
-/promotion/frontend/dist/
-/promotion/frontend/build/
 .npm/
 .pnpm-store/
 .yarn/

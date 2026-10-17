@@ -2,7 +2,7 @@
 
 基于 FastAPI + React + MySQL + Redis + Playwright 的闲鱼多账号自动化系统。
 
-主系统负责账号管理、消息收发、自动回复、自动发货、商品发布与后台管理；`promotion` 子项目负责返佣账号、选品规则、素材库、发布规则、删除规则和相关修复任务。
+主系统负责账号管理、消息收发、自动回复、自动发货、商品发布与后台管理。
 
 ## 🔴 说明
 
@@ -45,24 +45,13 @@
 | 商品采集与分销 | Goofish 采集、货源管理、对接记录、结算链路 |
 | 通知与风控 | 支持消息通知、风控日志、系统反馈与公告管理 |
 
-### 返佣子系统
-
-| 模块 | 说明 |
-|------|------|
-| 返佣账号 | 返佣账号登录、状态管理、Cookie 维护 |
-| 选品规则 | 按规则抓取候选商品并自动写入素材库 |
-| 素材库 | 管理标题、图片、详情、淘口令、短链、库存、发布状态 |
-| 发布规则 | 定时发布返佣商品，复用公共发布能力 |
-| 删除规则 | 定时删除已发布商品 |
-| 补偿任务 | 已发布商品 ID 回写、短链修复、卡券补偿等 |
-
 ## 技术栈
 
 ### 后端与自动化
 
 | 技术 | 说明 |
 |------|------|
-| FastAPI | 主系统与返佣后端 API 服务 |
+| FastAPI | 主系统 API 服务 |
 | SQLAlchemy 2.0 | ORM 与数据库访问 |
 | MySQL 8.0 | 主数据存储 |
 | Redis 7 | 缓存、会话与任务辅助 |
@@ -74,7 +63,7 @@
 
 | 技术 | 说明 |
 |------|------|
-| React 18 + TypeScript | 主系统与返佣前端 |
+| React 18 + TypeScript | 主系统前端 |
 | Vite | 开发与构建 |
 | TailwindCSS | 主系统 UI 样式 |
 | Zustand | 状态管理 |
@@ -111,12 +100,9 @@ xianyu-auto-reply/
 ├── backend-web/          # 主 Web API 服务（端口 8089）
 ├── websocket/            # 闲鱼连接与消息处理服务（端口 8090）
 ├── scheduler/            # 定时任务服务（端口 8091）
-├── common/               # 主系统与返佣系统共享模块
+├── common/               # 共享模块
 ├── frontend/             # 主系统前端（端口 9000）
 ├── launcher/             # Windows 桌面启动器（Nuitka 打包为 EXE）
-├── promotion/
-│   ├── backend/          # 返佣后端（端口 8092）
-│   └── frontend/         # 返佣前端（端口 9001）
 ├── scripts/              # CI/CD 与工具脚本
 ├── docker/frontend/      # 前端 Dockerfile 与 Nginx 配置
 ├── docker-compose.yml    # 本地源码构建编排
@@ -141,8 +127,6 @@ xianyu-auto-reply/
 | `backend-web` | 8089 | 主系统 API 网关、业务接口 |
 | `websocket` | 8090 | 闲鱼 WebSocket、消息收发、登录与订单联动 |
 | `scheduler` | 8091 | 定时任务执行器 |
-| `promotion/backend` | 8092 | 返佣后端 API |
-| `promotion/frontend` | 9001 | 返佣前端 |
 
 ### 架构说明
 
@@ -152,7 +136,6 @@ xianyu-auto-reply/
   - `websocket` 负责闲鱼实时连接、扫码登录、消息处理
   - `scheduler` 负责自动发货、评价、订单拉取、Cookie 刷新等定时任务
   - `common` 提供模型、数据库、自检、公共服务与工具
-- 返佣子系统位于 `promotion/` 目录，前后端独立，当前不在根目录 Docker Compose 编排内
 - 主系统三个后端服务都提供 `/health` 健康检查接口
 - Docker 依赖链：mysql/redis → backend-web → websocket → scheduler；frontend → backend-web
 
@@ -361,20 +344,6 @@ npm install
 npm run dev
 ```
 
-#### 5. 启动返佣子系统
-
-```bash
-# 返佣后端
-cd promotion/backend
-pip install -e .
-python main.py
-
-# 返佣前端
-cd promotion/frontend
-npm install
-npm run dev
-```
-
 ## 配置说明
 
 ### 关键环境变量
@@ -396,8 +365,6 @@ npm run dev
 
 - 主系统启动时自动建表、自检、缺失字段补齐、默认数据初始化
 - 默认管理员：`admin` / `admin123`
-- 返佣系统启动时执行独立的数据库自检
-- 返佣系统表统一使用 `fy_` 前缀
 - 不依赖外键约束，关系由代码维护
 - 所有时间统一使用北京时间（`Asia/Shanghai`）
 
@@ -432,7 +399,7 @@ npm run dev
 
 ## 安全说明
 
-- **JWT 认证**：主系统与返佣系统都使用 JWT 做登录态控制
+- **JWT 认证**：主系统使用 JWT 做登录态控制
 - **密码存储**：密码使用哈希方式保存
 - **SQL 注入防护**：数据库访问使用参数化查询
 - **XSS 防护**：前端输入与展示做好校验与转义
@@ -448,10 +415,6 @@ npm run dev
 6. 确保 Playwright 浏览器已正确安装
 
 ## 常见问题
-
-### 根目录 Docker Compose 没有启动返佣系统？
-
-当前 `docker-compose.yml` 只覆盖主系统。返佣系统需要单独启动。
 
 ### 登录或发布时报浏览器缺失？
 

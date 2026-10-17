@@ -8,8 +8,7 @@
 3. 使用账号对应的 Cookie 进行鉴权
 
 说明：
-- 请求构造（签名、appKey、header 等）与删除商品接口
-  (promotion/.../item_delete_api_service.py) 保持一致，仅 API 名、body、响应解析不同；
+- 请求构造（签名、appKey、header 等）与删除商品接口保持一致，仅 API 名、body、响应解析不同；
 - body 为 data={"itemIds":"id1,id2,..."}（逗号拼接的商品ID串）。
 """
 from __future__ import annotations

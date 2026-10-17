@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import {
-  ArrowUpCircle, BarChart3, Bell, Bot, Code, Github,
+  ArrowUpCircle, BarChart3, Bell, Bot, Github,
   Globe, Loader2, MessageSquare, RefreshCw, Truck,
   UserCheck,
 } from 'lucide-react'
@@ -186,40 +186,6 @@ export function About() {
           </div>
         </div>
       </div>
-      {/* Contributors */}
-      <div className="vben-card">
-        <div className="vben-card-header">
-          <h2 className="vben-card-title">
-            <Code className="w-4 h-4" />
-            贡献者
-          </h2>
-        </div>
-        <div className="vben-card-body">
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="https://github.com/zhinianboke"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-            >
-              <Github className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">zhinianboke</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">项目作者</span>
-            </a>
-            <a
-              href="https://github.com/legeling"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-            >
-              <Github className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">legeling</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">前端重构</span>
-            </a>
-          </div>
-        </div>
-      </div>
-
       {/* Links */}
       <div className="vben-card">
         <div className="vben-card-header">
@@ -227,14 +193,6 @@ export function About() {
         </div>
         <div className="vben-card-body">
           <div className="flex gap-3">
-            <a
-              href="https://pan.quark.cn/s/deaafecd8824"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors text-sm"
-            >
-              <span>Windows本地版</span>
-            </a>
             <a
               href="https://github.com/zhinianboke/xianyu-auto-reply"
               target="_blank"

@@ -34,7 +34,6 @@ PYPROJECT_FILES = [
     "backend-web/pyproject.toml",
     "websocket/pyproject.toml",
     "scheduler/pyproject.toml",
-    "promotion/backend/pyproject.toml",
 ]
 
 # 额外需要包含的依赖（编译工具等）

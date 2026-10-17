@@ -47,11 +47,6 @@ from common.models.listing_monitor_log import ListingMonitorLog
 from common.models.collect_fallback_account import CollectFallbackAccount
 from common.models.order_fallback_account import OrderFallbackAccount
 from common.models.auto_reply_message_log import XYAutoReplyMessageLog
-from common.models.fy_account import FYAccount, FYAccountType
-from common.models.fy_product_rule import FYProductRule
-from common.models.fy_material import FYMaterial
-from common.models.fy_publish_rule import FYPublishRule
-from common.models.fy_delete_rule import FYDeleteRule
 from common.models.xy_delivery_block_rule import XYDeliveryBlockRule
 from common.models.xy_personal_blacklist import XYPersonalBlacklist
 from common.models.xy_platform_blacklist import XYPlatformBlacklist
@@ -110,12 +105,6 @@ __all__ = [
     "CollectFallbackAccount",
     "OrderFallbackAccount",
     "XYAutoReplyMessageLog",
-    "FYAccount",
-    "FYAccountType",
-    "FYProductRule",
-    "FYMaterial",
-    "FYPublishRule",
-    "FYDeleteRule",
     "XYDeliveryBlockRule",
     "XYPersonalBlacklist",
     "XYPlatformBlacklist",

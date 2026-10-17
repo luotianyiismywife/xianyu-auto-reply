@@ -11,7 +11,7 @@
  * 7. 支持清空日志
  */
 import { useState, useEffect } from 'react'
-import { ShieldAlert, RefreshCw, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Loader2, Calendar, Info, TrendingUp, Settings } from 'lucide-react'
+import { ShieldAlert, RefreshCw, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Loader2, Calendar, TrendingUp, Settings } from 'lucide-react'
 import { getRiskLogs, clearRiskLogs, clearProcessingRiskLogs, testRemoteSliderSolve, getRemoteCaptchaConfig, saveRemoteCaptchaConfig, getRiskTodaySuccessRate, getLocalSliderConfig, updateLocalSliderConfig, type RiskLog, type RiskTodaySuccessRate } from '@/api/admin'
 import { getAccountDetails } from '@/api/accounts'
 import { useUIStore } from '@/store/uiStore'
@@ -440,14 +440,6 @@ export function RiskLogs() {
           {/* 展开后的详细配置（默认收起，减少页面纵向占用） */}
           {configExpanded && (
           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60">
-          {/* 配置说明提示条 */}
-          <div className="flex items-start gap-2 mb-4 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20">
-            <Info className="w-4 h-4 mt-0.5 shrink-0 text-blue-500 dark:text-blue-400" />
-            <div className="text-xs leading-relaxed text-blue-700 dark:text-blue-300 space-y-0.5">
-              <p>填写 <span className="font-medium">https://xy-api.zhinianboke.com/api/v1/captcha/slider-solve</span> 使用远程服务过滑块验证，提高成功率。</p>
-              <p>秘钥请在 <span className="font-medium">xy.zhinianboke.com</span> 注册账号后，于个人设置中获取，测试返回[punish 链接不能为空]，代表成功。</p>
-            </div>
-          </div>
           <div className="flex flex-wrap items-end gap-4">
             <div className="input-group flex-1 min-w-[260px]">
               <label className="input-label">远程服务URL</label>
