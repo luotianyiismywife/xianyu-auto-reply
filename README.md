@@ -1,33 +1,60 @@
-# 闲鱼自动回复系统
+# 闲鱼自动回复系统（自用精简版）
 
 基于 FastAPI + React + MySQL + Redis + Playwright 的闲鱼多账号自动化系统。
 
 主系统负责账号管理、消息收发、自动回复、自动发货、商品发布与后台管理。
 
-## 🔴 说明
+> **本仓库是上游 [zhinianboke/xianyu-auto-reply](https://github.com/zhinianboke/xianyu-auto-reply) 的个人自用精简分支（`feature/free-launcher`）。**
+> 仅保留单人自用所需的账号管理、自动回复、自动发货、商品发布等核心能力，删除了全部商用 / 多用户 / 推广 / 返佣功能。
 
-> **🔴 诚邀各位开发者提交pr，完善系统**
->
-> **🔴 承接各类项目定制，各类项目均可，有需要可联系，另外我菜，不一定都会**
+## 关于本分支
 
-## 🔴 最新源码地址(建议转存)
+### 分支性质
 
-> 🔴 我用夸克网盘给你分享了「自动发货」，点击链接或复制整段内容，打开「夸克网盘APP」即可获取。
-> 
-> 🔴 /~79313YhCQU~:/
-> 
-> 🔴 **链接：https://pan.quark.cn/s/af567356cba7**
+- **定位**：单人自用，本地 / 单机部署，不做多用户运营、不做对外售卖
+- **基线**：跟随上游 `main`，按需挑选可继承的通用改进
+- **原则**：只保留自用链路，删除一切商用、多租户、推广、返佣相关代码
 
-## 交流群
+### 相对上游删除的功能
 
-| 微信群 | QQ群 | 微信公众号 | Telegram | 赞赏支持 |
-|:---:|:---:|:---:|:---:|:---:|
-| ![微信群](https://xy.zhinianboke.com/static/qrcode/wechat-group.png) | ![QQ群](https://xy.zhinianboke.com/static/qrcode/qq-group.jpg) | ![微信公众号](https://xy.zhinianboke.com/static/qrcode/wechat-official-group.jpg) | ![Telegram](https://xy.zhinianboke.com/static/qrcode/telegram-group.png) | ![赞赏支持](https://xy.zhinianboke.com/static/qrcode/reward-group.png) |
-| 扫码加好友拉微信交流群 | 扫码加入QQ交流群 | 关注公众号发送"最新源码"获取最新代码 | 扫码加入Telegram群 | 如果觉得好用，请作者喝杯咖啡 |
+| 类别 | 删除内容 |
+|------|----------|
+| 授权 / 激活 | 激活码生成与校验、机器码、许可证（`launcher/activation.py`、`keygen.py`、`hardware_id.py`） |
+| 多用户 / 商用 | 用户注册、用户管理、充值 / 提现 / 结算、用户到期、分销 / 对接 / 提货 / 退款注销 |
+| 推广 / 运营 | 广告位、公告 / 弹窗公告、返佣子系统（`promotion/`，淘宝联盟选品 → 自动发闲鱼）、源码推广页、交流群 / 赞赏 / 网盘引流 |
+| 客户端 | `xianyu-mobile` 手机端工程 |
+| 部署 | 服务器一键部署 / 更新脚本、Docker 编排、Jenkins 流水线、离线依赖打包（保留本地一键启动链） |
 
-如群二维码过期，请关注公众号获取最新群链接。
+### 相对上游保留的功能
 
----
+- 多账号管理、Cookie 维护与登录续期
+- 自动回复（文本 / 图片关键词、默认回复、商品专属回复）、AI 回复
+- 自动发货（卡券、虚拟商品、自动补发）
+- 在线聊天、订单与评价、商品发布（素材库 / 地址库 / 单品 / 批量）
+- 通知渠道、风控日志、系统设置
+- Windows 桌面启动器（`launcher/`，Nuitka 打包 EXE）
+- 本地一键启动链（`一键启动.bat`、`安装依赖.bat`、`scripts/mysql_start.bat`、`scripts/redis_start.bat`）
+
+### 从上游继承的改进
+
+| 上游提交 | 内容 | 继承情况 |
+|----------|------|----------|
+| `c9efea9` 完善日志 | 邮件发送日志（`xy_email_logs`）、通用数据字典（`xy_data_dictionaries`）、邮件日志管理页 | ✅ 已继承（去掉提现通知相关） |
+
+### 同步上游
+
+```bash
+git remote add upstream https://github.com/zhinianboke/xianyu-auto-reply.git   # 首次
+git fetch upstream
+git log --oneline main..upstream/main                     # 查看上游新提交
+git diff feature/free-launcher upstream/main -- <文件>     # 评估可继承改动
+```
+
+> 上游改动需人工评估：涉及已删功能（注册 / 提现 / 返佣等）的部分直接跳过，通用改进（日志、分页组件、通用模型等）按需挑选后手工合并。
+
+### 更新日志
+
+各发行版变更详见 [CHANGELOG.md](CHANGELOG.md)。当前版本：**free-1.0.0**。
 
 ## 功能概览
 
@@ -141,26 +168,20 @@ xianyu-auto-reply/
 
 ## 快速开始
 
-### 方式一：服务器一键部署（推荐）
+### 方式一：本地一键启动（推荐）
 
-服务器已安装 Docker 与 Docker Compose 后，直接执行一键部署脚本即可：
+Windows 本地自用推荐直接运行 `一键启动.bat`：脚本会依次启动 MySQL 绿色版、Redis 绿色版，并打开桌面启动器。
 
-```bash
-curl -fsSL https://xy-update.zhinianboke.com/deploy.sh | sed 's/\r$//' | bash
+```bat
+一键启动.bat
 ```
 
-该脚本会自动完成部署所需的配置生成、镜像拉取、旧容器清理与服务启动。
+启动器打开后填写 MySQL / Redis 连接信息，点击“保存配置并启动服务”即可。默认已匹配绿色版（MySQL `127.0.0.1:3306` root 无密码 / Redis `127.0.0.1:6379`）。
 
-更新版本，直接执行一键更新脚本即可：
-
-```bash
-curl -fsSL https://xy-update.zhinianboke.com/update.sh | sed 's/\r$//' | bash
-```
-
-### 方式二：克隆仓库部署
+### 方式二：克隆本仓库部署
 
 ```bash
-git clone https://github.com/zhinianboke/xianyu-auto-reply.git
+git clone https://github.com/luotianyiismywife/xianyu-auto-reply.git
 cd xianyu-auto-reply
 bash deploy.sh
 ```
@@ -183,21 +204,19 @@ bash update.sh
 
 当 MySQL 和 Redis 由外部（如云数据库 RDS、独立服务器或已有实例）提供时，可使用 `deploy_remote.sh`。
 该脚本**不内置 mysql/redis 容器**，仅拉取并启动 4 个应用服务（frontend / backend-web / websocket / scheduler），
-数据库连接信息通过 `.env.remote` 配置。与方式一相同，直接远程拉取脚本执行即可：
+数据库连接信息通过 `.env.remote` 配置，直接运行本地脚本即可：
 
 ```bash
 # 1) 首次运行：自动生成 .env.remote 后退出，提示填写远程连接信息
-curl -fsSL https://xy-update.zhinianboke.com/deploy_remote.sh | sed 's/\r$//' | bash
+bash deploy_remote.sh
 
 # 2) 编辑 .env.remote，填写真实的远程地址（勿填 localhost）
 #    MYSQL_HOST / REDIS_HOST 等
 vim .env.remote
 
 # 3) 再次运行：校验配置 → 自动生成 docker-compose.remote.yml → 拉取镜像 → 启动
-curl -fsSL https://xy-update.zhinianboke.com/deploy_remote.sh | sed 's/\r$//' | bash
+bash deploy_remote.sh
 ```
-
-> 已克隆仓库的也可改用本地脚本：`bash deploy_remote.sh`（首次生成配置后退出，填好 `.env.remote` 再次执行）。
 
 - 首次运行自动生成 `.env.remote`，每次运行自动生成 `docker-compose.remote.yml`，均不影响根目录原有的 `.env` / `docker-compose.yml` / `docker-compose.deploy.yml`
 - 容器名与主套保持一致（`xianyu-backend-web` / `xianyu-websocket` / `xianyu-scheduler` / `xianyu-frontend`），与方式二/方式四属于同一套部署，二者只需选其一，不要同时启动
@@ -435,8 +454,8 @@ Docker 环境依赖各服务 Dockerfile 内已安装的浏览器。
 sed -i 's/\r$//' deploy.sh
 bash deploy.sh
 
-# 方法二：通过管道执行（推荐远程脚本使用）
-curl -fsSL https://xy-update.zhinianboke.com/deploy.sh | sed 's/\r$//' | bash
+# 方法二：通过管道执行
+cat deploy.sh | sed 's/\r$//' | bash
 ```
 
 ## 许可证
@@ -1136,8 +1155,4 @@ GET /api/v1/external/message-logs?secret_key=your-secret-key&item_id=商品ID&me
   "data": null
 }
 ```
-
-## Star History
-
-[![Star History Chart](https://star-history.dera.page/svg?repos=zhinianboke/xianyu-auto-reply&type=Date)](https://star-history.dera.page/#zhinianboke/xianyu-auto-reply&Date)
 

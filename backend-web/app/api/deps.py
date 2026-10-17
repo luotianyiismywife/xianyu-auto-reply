@@ -149,6 +149,12 @@ async def get_user_login_log_service(session: AsyncSession = Depends(get_db_sess
     return UserLoginLogService(session)
 
 
+async def get_email_log_service(session: AsyncSession = Depends(get_db_session)):
+    """获取邮件日志服务"""
+    from app.services.email_log_service import EmailLogService
+    return EmailLogService(session)
+
+
 async def get_db_backup_log_service(session: AsyncSession = Depends(get_db_session)):
     """获取数据库备份日志服务"""
     from app.services.db_backup_log_service import DbBackupLogService
